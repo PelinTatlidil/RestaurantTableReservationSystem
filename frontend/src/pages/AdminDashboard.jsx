@@ -1,3 +1,6 @@
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 import { Link } from 'react-router-dom';
 
 const stats = [
@@ -146,6 +149,24 @@ const AdminDashboard = () => {
         </section>
       </section>
     </main>
+=======
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+const AdminDashboard = () => {
+  return (
+    <div className="max-w-3xl mx-auto mt-16 p-6 bg-white rounded shadow">
+      <h1 className="text-2xl font-bold mb-2">Admin Dashboard</h1>
+      <p>Welcome! You are logged in as an administrator.</p>
+    </div>
+<<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
   );
 };
 
