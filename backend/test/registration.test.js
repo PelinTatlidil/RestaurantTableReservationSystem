@@ -65,6 +65,7 @@ describe('Customer registration', () => {
       name: 'Pelin Tatlidil',
       email: 'pelin@example.com',
       phone: '0400123456',
+      role: 'customer',
     });
     const req = {
       body: {
@@ -83,6 +84,7 @@ describe('Customer registration', () => {
       email: 'pelin@example.com',
       phone: '0400123456',
       password: 'secret123',
+      role: 'customer',
     })).to.equal(true);
     expect(res.statusCode).to.equal(201);
     expect(res.body).to.include({
@@ -90,6 +92,7 @@ describe('Customer registration', () => {
       name: 'Pelin Tatlidil',
       email: 'pelin@example.com',
       phone: '0400123456',
+      role: 'customer',
       message: 'Registration successful',
     });
     expect(res.body.token).to.be.a('string');

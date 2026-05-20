@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const isAdmin = user?.role === 'admin';
 
   const handleLogout = () => {
     logout();
@@ -24,18 +25,33 @@ const Navbar = () => {
             <NavLink to="/" className={linkClass}>
               Home
             </NavLink>
-            <NavLink to="/make-reservation" className={linkClass}>
-              Make Reservation
-            </NavLink>
-            <NavLink to="/my-reservations" className={linkClass}>
-              My Reservations
-            </NavLink>
-            <NavLink to="/tasks" className={linkClass}>
-              Tables
-            </NavLink>
-            <NavLink to="/profile" className={linkClass}>
-              Dashboard
-            </NavLink>
+            {isAdmin ? (
+              <>
+                <NavLink to="/admin-dashboard" className={linkClass}>
+                  Dashboard
+                </NavLink>
+                <NavLink to="/my-reservations" className={linkClass}>
+                  Reservations
+                </NavLink>
+                <NavLink to="/tasks" className={linkClass}>
+                  Tables
+                </NavLink>
+                <span className="restaurant-nav-link">Users</span>
+                <span className="restaurant-nav-link">Restaurant Info</span>
+              </>
+            ) : (
+              <>
+                <NavLink to="/make-reservation" className={linkClass}>
+                  Make Reservation
+                </NavLink>
+                <NavLink to="/my-reservations" className={linkClass}>
+                  My Reservations
+                </NavLink>
+                <NavLink to="/profile" className={linkClass}>
+                  Dashboard
+                </NavLink>
+              </>
+            )}
             <button
               onClick={handleLogout}
               className="restaurant-nav-link"
