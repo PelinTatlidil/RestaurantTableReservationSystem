@@ -1,52 +1,104 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axiosInstance from '../axiosConfig';
 
 const Register = () => {
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '' });
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [message, setMessage] = useState({ type: '', text: '' });
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMessage({ type: '', text: '' });
+
+    if (!formData.name || !formData.email || !formData.phone || !formData.password) {
+      setMessage({ type: 'error', text: 'Please complete all required fields.' });
+      return;
+    }
+
+    if (formData.password !== confirmPassword) {
+      setMessage({ type: 'error', text: 'Passwords do not match.' });
+      return;
+    }
+
     try {
-      await axiosInstance.post('/api/auth/register', formData);
-      alert('Registration successful. Please log in.');
-      navigate('/login');
+      const response = await axiosInstance.post('/api/auth/register', formData);
+      setMessage({
+        type: 'success',
+        text: response.data.message || 'Registration successful. Please log in.',
+      });
+      setTimeout(() => navigate('/login'), 1200);
     } catch (error) {
-      alert('Registration failed. Please try again.');
+      setMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Registration failed. Please try again.',
+      });
     }
   };
 
   return (
-    <div className="max-w-md mx-auto mt-20">
-      <form onSubmit={handleSubmit} className="bg-white p-6 shadow-md rounded">
-        <h1 className="text-2xl font-bold mb-4 text-center">Register</h1>
-        <input
-          type="text"
-          placeholder="Name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          className="w-full mb-4 p-2 border rounded"
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full mb-4 p-2 border rounded"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={formData.password}
-          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-          className="w-full mb-4 p-2 border rounded"
-        />
-        <button type="submit" className="w-full bg-green-600 text-white p-2 rounded">
-          Register
-        </button>
-      </form>
-    </div>
+    <main className="restaurant-auth-page">
+      <section className="w-full max-w-[477px]">
+        <h1 className="mb-8 font-serif text-5xl font-semibold text-stone-950">Register Account</h1>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <input
+            type="text"
+            placeholder="Name"
+            required
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            className="restaurant-input"
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            required
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            className="restaurant-input"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            required
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            className="restaurant-input"
+          />
+          <input
+            type="password"
+            placeholder="Confirm Password"
+            required
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className="restaurant-input"
+          />
+          <input
+            type="tel"
+            placeholder="Phone Number"
+            required
+            value={formData.phone}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            className="restaurant-input"
+          />
+          {message.text && (
+            <p className={message.type === 'error' ? 'restaurant-message-error' : 'restaurant-message-success'}>
+              {message.text}
+            </p>
+          )}
+          <button type="submit" className="restaurant-button mt-4 w-[147px]">
+            Register
+          </button>
+        </form>
+        <div className="mt-6 flex flex-wrap items-center gap-4 text-xl text-stone-800">
+          <span>Already have an account?</span>
+          <Link to="/login" className="restaurant-button restaurant-button-secondary w-[130px]">
+            Login
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 };
 

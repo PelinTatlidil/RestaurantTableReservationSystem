@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
@@ -10,30 +10,56 @@ const Navbar = () => {
     navigate('/login');
   };
 
+  const linkClass = ({ isActive }) =>
+    `restaurant-nav-link ${isActive ? 'restaurant-nav-link-active' : ''}`;
+
   return (
-    <nav className="bg-blue-600 text-white p-4 flex justify-between items-center">
-      <Link to="/" className="text-2xl font-bold">Your apps name</Link>
-      <div>
+    <nav className="restaurant-nav">
+      <Link to="/" className="font-serif text-2xl font-semibold text-stone-950">
+        Digi Meat Restaurant
+      </Link>
+      <div className="flex flex-wrap items-center justify-end gap-x-8 gap-y-3">
         {user ? (
           <>
-            <Link to="/tasks" className="mr-4">CRUD</Link>
-            <Link to="/profile" className="mr-4">Profile</Link>
+            <NavLink to="/" className={linkClass}>
+              Home
+            </NavLink>
+            <NavLink to="/make-reservation" className={linkClass}>
+              Make Reservation
+            </NavLink>
+            <NavLink to="/my-reservations" className={linkClass}>
+              My Reservations
+            </NavLink>
+            <NavLink to="/tasks" className={linkClass}>
+              Tables
+            </NavLink>
+            <NavLink to="/profile" className={linkClass}>
+              Dashboard
+            </NavLink>
             <button
               onClick={handleLogout}
-              className="bg-red-500 px-4 py-2 rounded hover:bg-red-700"
+              className="restaurant-nav-link"
             >
               Logout
             </button>
           </>
         ) : (
           <>
-            <Link to="/login" className="mr-4">Login</Link>
-            <Link
-              to="/register"
-              className="bg-green-500 px-4 py-2 rounded hover:bg-green-700"
-            >
+            <NavLink to="/" className={linkClass}>
+              Home
+            </NavLink>
+            <NavLink to="/make-reservation" className={linkClass}>
+              Make Reservation
+            </NavLink>
+            <NavLink to="/my-reservations" className={linkClass}>
+              My Reservations
+            </NavLink>
+            <NavLink to="/login" className={linkClass}>
+              Login
+            </NavLink>
+            <NavLink to="/register" className="restaurant-button h-[49px] px-6">
               Register
-            </Link>
+            </NavLink>
           </>
         )}
       </div>

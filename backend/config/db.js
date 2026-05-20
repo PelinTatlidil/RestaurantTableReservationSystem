@@ -1,4 +1,10 @@
 // config/db.js
+const dns = require("node:dns");
+
+// Force Node.js to use Cloudflare DNS
+dns.setServers(["1.1.1.1", "1.0.0.1"]);
+
+// config/db.js
 const mongoose = require("mongoose");
 
 // Set strictQuery explicitly to suppress the warning
