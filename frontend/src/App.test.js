@@ -48,6 +48,22 @@ const waitFor = async (assertion) => {
   throw lastError;
 };
 
+const changeInputValue = (input, value) => {
+  const valueSetter = Object.getOwnPropertyDescriptor(input, 'value')?.set;
+  const prototype = Object.getPrototypeOf(input);
+  const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+
+  if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
+    prototypeValueSetter.call(input, value);
+  } else if (valueSetter) {
+    valueSetter.call(input, value);
+  } else {
+    input.value = value;
+  }
+
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
 describe('logout and protected access', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -72,10 +88,8 @@ describe('logout and protected access', () => {
     const passwordInput = container.querySelector('input[type="password"]');
 
     act(() => {
-      emailInput.value = 'customer@example.com';
-      emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-      passwordInput.value = 'secret123';
-      passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+      changeInputValue(emailInput, 'customer@example.com');
+      changeInputValue(passwordInput, 'secret123');
     });
 
     expect(container.textContent).toContain('Log In');
@@ -129,6 +143,87 @@ describe('logout and protected access', () => {
     await waitFor(() => {
       expect(localStorage.getItem('user')).toBeNull();
       expect(container.textContent).toContain('Log In');
+    });
+  });
+});
+
+describe('customer profile management', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+    }
+    if (container) {
+      document.body.removeChild(container);
+    }
+    root = null;
+    container = null;
+  });
+
+  test('customer can view and update name and phone number', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Pelin',
+        email: 'pelin@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get.mockResolvedValue({
+      data: {
+        name: 'Pelin',
+        email: 'pelin@example.com',
+        phone: '0400123456',
+        role: 'customer',
+      },
+    });
+    axiosInstance.put.mockResolvedValue({
+      data: {
+        id: 'customer-id',
+        name: 'Pelin Tatlidil',
+        email: 'pelin@example.com',
+        phone: '0400987654',
+        role: 'customer',
+        message: 'Profile updated successfully',
+      },
+    });
+
+    await renderAppAt('/profile');
+
+    await waitFor(() => {
+      expect(container.querySelector('input[placeholder="Name"]').value).toBe('Pelin');
+      expect(container.querySelector('input[placeholder="Phone"]').value).toBe('0400123456');
+    });
+
+    const nameInput = container.querySelector('input[placeholder="Name"]');
+    const phoneInput = container.querySelector('input[placeholder="Phone"]');
+    const form = container.querySelector('form');
+
+    await act(async () => {
+      changeInputValue(nameInput, 'Pelin Tatlidil');
+      changeInputValue(phoneInput, '0400987654');
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.put).toHaveBeenCalledWith(
+        '/api/auth/profile',
+        {
+          name: 'Pelin Tatlidil',
+          phone: '0400987654',
+        },
+        {
+          headers: { Authorization: 'Bearer customer-token' },
+        }
+      );
+      expect(container.textContent).toContain('Profile updated successfully');
     });
   });
 });

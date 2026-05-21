@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
 const User = require('../models/User');
-const { checkEmail, registerUser } = require('../controllers/authController');
+const { checkEmail, registerUser, updateUserProfile } = require('../controllers/authController');
 
 const createResponse = () => {
   const res = {
@@ -125,5 +125,65 @@ describe('Customer registration', () => {
       exists: false,
       message: 'Email address is available',
     });
+  });
+});
+
+describe('Customer profile management', () => {
+  beforeEach(() => {
+    process.env.JWT_SECRET = 'test-secret';
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('rejects profile updates without name and phone number', async () => {
+    sinon.stub(User, 'findById').resolves({
+      id: 'customer-id',
+      name: 'Pelin',
+      email: 'pelin@example.com',
+      phone: '0400123456',
+    });
+    const req = { user: { id: 'customer-id' }, body: { name: '', phone: '' } };
+    const res = createResponse();
+
+    await updateUserProfile(req, res);
+
+    expect(res.statusCode).to.equal(400);
+    expect(res.body.message).to.equal('Name and phone number are required');
+  });
+
+  it('saves updated customer name and phone number', async () => {
+    const customer = {
+      id: 'customer-id',
+      name: 'Pelin',
+      email: 'pelin@example.com',
+      phone: '0400123456',
+      role: 'customer',
+      save: sinon.stub(),
+    };
+    customer.save.resolves(customer);
+    sinon.stub(User, 'findById').resolves(customer);
+    const req = {
+      user: { id: 'customer-id' },
+      body: { name: ' Pelin Tatlidil ', phone: ' 0400987654 ' },
+    };
+    const res = createResponse();
+
+    await updateUserProfile(req, res);
+
+    expect(customer.name).to.equal('Pelin Tatlidil');
+    expect(customer.phone).to.equal('0400987654');
+    expect(customer.save.calledOnce).to.equal(true);
+    expect(res.statusCode).to.equal(200);
+    expect(res.body).to.include({
+      id: 'customer-id',
+      name: 'Pelin Tatlidil',
+      email: 'pelin@example.com',
+      phone: '0400987654',
+      role: 'customer',
+      message: 'Profile updated successfully',
+    });
+    expect(res.body.token).to.be.a('string');
   });
 });

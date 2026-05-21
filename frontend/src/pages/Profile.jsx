@@ -9,10 +9,9 @@ const Profile = () => {
     name: '',
     email: '',
     phone: '',
-    university: '',
-    address: '',
   });
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
     // Fetch profile data from the backend
@@ -26,11 +25,12 @@ const Profile = () => {
           name: response.data.name,
           email: response.data.email,
           phone: response.data.phone || '',
-          university: response.data.university || '',
-          address: response.data.address || '',
         });
       } catch (error) {
-        alert('Failed to fetch profile. Please try again.');
+        setMessage({
+          type: 'error',
+          text: 'Failed to fetch profile. Please try again.',
+        });
       } finally {
         setLoading(false);
       }
@@ -41,14 +41,43 @@ const Profile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMessage({ type: '', text: '' });
+
+    if (!formData.name.trim() || !formData.phone.trim()) {
+      setMessage({
+        type: 'error',
+        text: 'Name and phone number are required.',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      await axiosInstance.put('/api/auth/profile', formData, {
-        headers: { Authorization: `Bearer ${user.token}` },
+      const response = await axiosInstance.put(
+        '/api/auth/profile',
+        {
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+        },
+        {
+          headers: { Authorization: `Bearer ${user.token}` },
+        }
+      );
+
+      setFormData({
+        name: response.data.name,
+        email: response.data.email,
+        phone: response.data.phone || '',
       });
-      alert('Profile updated successfully!');
+      setMessage({
+        type: 'success',
+        text: response.data.message || 'Profile updated successfully.',
+      });
     } catch (error) {
-      alert('Failed to update profile. Please try again.');
+      setMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Failed to update profile. Please try again.',
+      });
     } finally {
       setLoading(false);
     }
@@ -95,9 +124,13 @@ const Profile = () => {
 
         <form onSubmit={handleSubmit} className="restaurant-card mt-12 grid gap-5 p-8 md:grid-cols-2">
           <h2 className="font-serif text-3xl text-stone-950 md:col-span-2">Your Profile</h2>
+          <p className="text-lg text-stone-700 md:col-span-2">
+            Update your personal details below.
+          </p>
           <input
             type="text"
             placeholder="Name"
+            required
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             className="restaurant-input"
@@ -106,30 +139,30 @@ const Profile = () => {
             type="email"
             placeholder="Email"
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="restaurant-input"
+            readOnly
+            className="restaurant-input opacity-75"
           />
           <input
             type="tel"
             placeholder="Phone"
+            required
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             className="restaurant-input"
           />
-          <input
-            type="text"
-            placeholder="University"
-            value={formData.university}
-            onChange={(e) => setFormData({ ...formData, university: e.target.value })}
-            className="restaurant-input"
-          />
-          <input
-            type="text"
-            placeholder="Address"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-            className="restaurant-input"
-          />
+
+          {message.text && (
+            <p
+              className={
+                message.type === 'error'
+                  ? 'restaurant-message-error md:col-span-2'
+                  : 'restaurant-message-success md:col-span-2'
+              }
+            >
+              {message.text}
+            </p>
+          )}
+
           <button type="submit" className="restaurant-button md:col-span-2 md:w-[240px]">
             {loading ? 'Updating...' : 'Update Profile'}
           </button>

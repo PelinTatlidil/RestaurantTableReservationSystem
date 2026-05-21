@@ -145,13 +145,18 @@ const updateUserProfile = async (req, res) => {
             });
         }
 
-        const { name, email, phone, university, address } = req.body;
+        const { name, phone } = req.body;
+        const normalizedName = name ? name.trim() : '';
+        const normalizedPhone = phone ? phone.trim() : '';
 
-        user.name = name ? name.trim() : user.name;
-        user.email = email ? normalizeEmail(email) : user.email;
-        user.phone = phone ? phone.trim() : user.phone;
-        user.university = university || user.university;
-        user.address = address || user.address;
+        if (!normalizedName || !normalizedPhone) {
+            return res.status(400).json({
+                message: 'Name and phone number are required',
+            });
+        }
+
+        user.name = normalizedName;
+        user.phone = normalizedPhone;
 
         const updatedUser = await user.save();
         return res.json({
@@ -160,8 +165,7 @@ const updateUserProfile = async (req, res) => {
             email: updatedUser.email,
             phone: updatedUser.phone,
             role: updatedUser.role,
-            university: updatedUser.university,
-            address: updatedUser.address,
+            message: 'Profile updated successfully',
             token: generateToken(updatedUser.id, updatedUser.role),
         });
     } catch (error) {
