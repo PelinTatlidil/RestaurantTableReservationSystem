@@ -69,23 +69,27 @@ const Profile = () => {
         </div>
 
         <div className="grid gap-8 md:grid-cols-2">
-          <article className="restaurant-card p-8">
+          <article className="restaurant-card flex h-full flex-col p-8">
             <h2 className="font-serif text-3xl text-stone-950">Make a Reservation</h2>
             <p className="mt-4 text-xl text-stone-700">
               Book a table by selecting a date, time and number of guests.
             </p>
-            <Link to="/make-reservation" className="restaurant-button mt-8 w-[167px]">
-              Register
-            </Link>
+            <div className="mt-auto pt-8">
+              <Link to="/make-reservation" className="restaurant-button w-[167px]">
+                Book now
+              </Link>
+            </div>
           </article>
-          <article className="restaurant-card p-8">
+          <article className="restaurant-card flex h-full flex-col p-8">
             <h2 className="font-serif text-3xl text-stone-950">My Reservations</h2>
             <p className="mt-4 text-xl text-stone-700">
               View, update or cancel your existing reservations.
             </p>
-            <Link to="/my-reservations" className="restaurant-button mt-8 w-[266px]">
-              My Reservations
-            </Link>
+            <div className="mt-auto pt-8">
+              <Link to="/my-reservations" className="restaurant-button w-[266px]">
+                My Reservations
+              </Link>
+            </div>
           </article>
         </div>
 

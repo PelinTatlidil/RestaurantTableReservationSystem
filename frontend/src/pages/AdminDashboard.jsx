@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const stats = [
   {
@@ -73,13 +74,24 @@ const statusClass = {
 };
 
 const AdminDashboard = () => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <main className="restaurant-admin-page px-6 py-10">
       <section className="mx-auto max-w-[1376px]">
-        <div className="mb-6">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="font-serif text-5xl font-semibold text-stone-950">
             Admin Dashboard
           </h1>
+          <button type="button" onClick={handleLogout} className="restaurant-button w-[130px]">
+            Logout
+          </button>
         </div>
 
         <section className="grid gap-8 xl:grid-cols-4">
