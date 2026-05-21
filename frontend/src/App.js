@@ -24,6 +24,14 @@ const RequireRole = ({ children, role }) => {
   return children;
 };
 
+const RequireAuth = ({ children }) => {
+  const { user } = useAuth();
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  return children;
+};
+
 function App() {
   return (
     <Router>
@@ -32,7 +40,14 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route
+          path="/profile"
+          element={
+            <RequireRole role="customer">
+              <Profile />
+            </RequireRole>
+          }
+        />
 
         <Route
           path="/admin-dashboard"
@@ -52,10 +67,38 @@ function App() {
           }
         />
 
-        <Route path="/my-reservations" element={<MyReservations />} />
-        <Route path="/make-reservation" element={<MakeReservation />} />
-        <Route path="/reservation-confirmation" element={<ReservationConfirmation />} />
-        <Route path="/customer-panel" element={<CustomerPanel />} />
+        <Route
+          path="/my-reservations"
+          element={
+            <RequireAuth>
+              <MyReservations />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/make-reservation"
+          element={
+            <RequireAuth>
+              <MakeReservation />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/reservation-confirmation"
+          element={
+            <RequireAuth>
+              <ReservationConfirmation />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/customer-panel"
+          element={
+            <RequireRole role="customer">
+              <CustomerPanel />
+            </RequireRole>
+          }
+        />
       </Routes>
 
       <footer className="restaurant-footer">
