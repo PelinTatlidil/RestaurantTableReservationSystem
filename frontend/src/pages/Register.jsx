@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axiosInstance from '../axiosConfig';
 
@@ -12,7 +12,45 @@ const Register = () => {
 
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [emailStatus, setEmailStatus] = useState({
+    checking: false,
+    exists: false,
+    text: '',
+  });
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const email = formData.email.trim().toLowerCase();
+
+    if (!email || !email.includes('@')) {
+      setEmailStatus({ checking: false, exists: false, text: '' });
+      return undefined;
+    }
+
+    setEmailStatus({ checking: true, exists: false, text: 'Checking email...' });
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await axiosInstance.get('/api/auth/check-email', {
+          params: { email },
+        });
+
+        setEmailStatus({
+          checking: false,
+          exists: response.data.exists,
+          text: response.data.exists ? 'Email address already exists.' : '',
+        });
+      } catch (error) {
+        setEmailStatus({
+          checking: false,
+          exists: false,
+          text: '',
+        });
+      }
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.email]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,6 +81,14 @@ const Register = () => {
       setMessage({
         type: 'error',
         text: 'Passwords do not match.',
+      });
+      return;
+    }
+
+    if (emailStatus.exists) {
+      setMessage({
+        type: 'error',
+        text: 'Email address already exists.',
       });
       return;
     }
@@ -95,6 +141,18 @@ const Register = () => {
             className="restaurant-input"
           />
 
+          {emailStatus.text && (
+            <p
+              className={
+                emailStatus.exists
+                  ? 'restaurant-message-error'
+                  : 'text-sm font-semibold text-stone-600'
+              }
+            >
+              {emailStatus.text}
+            </p>
+          )}
+
           <input
             type="tel"
             placeholder="Phone Number"
@@ -134,7 +192,11 @@ const Register = () => {
             </p>
           )}
 
-          <button type="submit" className="restaurant-button mt-4 w-[147px]">
+          <button
+            type="submit"
+            disabled={emailStatus.checking || emailStatus.exists}
+            className="restaurant-button mt-4 w-[147px] disabled:cursor-not-allowed disabled:opacity-60"
+          >
             Register
           </button>
         </form>

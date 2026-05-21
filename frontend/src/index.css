@@ -5,9 +5,9 @@
 @layer base {
   body {
     margin: 0;
-    background: #f7f1e8;
+    background: linear-gradient(135deg, #AFEF88 0%, #F9FAFF 100%);
     color: #1c1712;
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: Inter, Arial, sans-serif;
   }
 
   button,
@@ -20,17 +20,12 @@
 @layer components {
   .restaurant-page {
     min-height: calc(100vh - 96px);
-    background:
-      radial-gradient(circle at 50% -10%, rgba(227, 213, 194, 0.8), transparent 33rem),
-      #f7f1e8;
+    background: linear-gradient(135deg, #AFEF88 0%, #F9FAFF 100%);
   }
 
   .restaurant-auth-page {
     min-height: calc(100vh - 96px);
-    background:
-      linear-gradient(90deg, rgba(247, 241, 232, 0.96) 0%, rgba(247, 241, 232, 0.8) 48%, rgba(72, 48, 30, 0.28) 100%),
-      radial-gradient(circle at 82% 28%, rgba(120, 64, 32, 0.32), transparent 23rem),
-      linear-gradient(135deg, #eadfcf 0%, #f7f1e8 47%, #9b6844 100%);
+    background: linear-gradient(135deg, #AFEF88 0%, #F9FAFF 100%);
     display: flex;
     align-items: center;
     padding: 6rem max(1.5rem, 17vw);
@@ -38,7 +33,7 @@
 
   .restaurant-admin-page {
     min-height: calc(100vh - 96px);
-    background: #f2e8dc;
+    background: linear-gradient(135deg, #AFEF88 0%, #F9FAFF 100%);
   }
 
   .restaurant-nav {
@@ -51,7 +46,7 @@
     justify-content: space-between;
     gap: 2rem;
     border-bottom: 1px solid rgba(69, 52, 38, 0.12);
-    background: rgba(247, 241, 232, 0.92);
+    background: rgba(249, 250, 255, 0.92);
     padding: 1.25rem 2rem;
     backdrop-filter: blur(14px);
   }
@@ -66,7 +61,7 @@
 
   .restaurant-nav-link:hover,
   .restaurant-nav-link-active {
-    color: #8a4f2c;
+    color: #016630;
   }
 
   .restaurant-button {
@@ -74,9 +69,9 @@
     min-height: 49px;
     align-items: center;
     justify-content: center;
-    border: 1px solid #8a4f2c;
+    border: 1px solid #016630;
     border-radius: 6px;
-    background: #8a4f2c;
+    background: #016630;
     color: #fffaf2;
     font-size: 1.125rem;
     font-weight: 600;
@@ -87,13 +82,22 @@
   }
 
   .restaurant-button:hover {
-    background: #6f3e22;
+    background: #014f26;
     transform: translateY(-1px);
+  }
+
+  .restaurant-nav-button {
+    border-color: #016630;
+    background: #016630;
+  }
+
+  .restaurant-nav-button:hover {
+    background: #014f26;
   }
 
   .restaurant-button-secondary {
     background: #f7f1e8;
-    color: #8a4f2c;
+    color: #016630;
   }
 
   .restaurant-card {
@@ -137,8 +141,8 @@
   .restaurant-input:focus,
   .restaurant-field input:focus,
   .restaurant-field textarea:focus {
-    border-color: #8a4f2c;
-    box-shadow: 0 0 0 4px rgba(138, 79, 44, 0.12);
+    border-color: #016630;
+    box-shadow: 0 0 0 4px rgba(1, 102, 48, 0.12);
   }
 
   .restaurant-field {
@@ -295,9 +299,9 @@
     min-height: 44px;
     align-items: center;
     justify-content: center;
-    border: 1px solid #8a4f2c;
+    border: 1px solid #016630;
     border-radius: 6px;
-    background: #8a4f2c;
+    background: #016630;
     color: white;
     font-size: 1rem;
     font-weight: 700;
@@ -310,7 +314,7 @@
   }
 
   .restaurant-footer {
-    background: #f7f1e8;
+    background: linear-gradient(135deg, #AFEF88 0%, #F9FAFF 100%);
     color: #59483a;
     padding: 1.25rem;
     text-align: center;
@@ -319,7 +323,7 @@
 
 @layer utilities {
   .font-serif {
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: Inter, Arial, sans-serif;
   }
 }
 

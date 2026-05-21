@@ -57,6 +57,27 @@ const registerUser = async (req, res) => {
     }
 };
 
+const checkEmail = async (req, res) => {
+    const normalizedEmail = normalizeEmail(req.query.email);
+
+    if (!normalizedEmail) {
+        return res.status(400).json({
+            message: 'Email is required',
+        });
+    }
+
+    try {
+        const userExists = await User.exists({ email: normalizedEmail });
+
+        return res.status(200).json({
+            exists: Boolean(userExists),
+            message: userExists ? 'Email address already exists' : 'Email address is available',
+        });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+
 const loginUser = async (req, res) => {
     const { email, password } = req.body;
     const normalizedEmail = normalizeEmail(email);
@@ -149,6 +170,7 @@ const updateUserProfile = async (req, res) => {
 };
 
 module.exports = {
+    checkEmail,
     registerUser,
     loginUser,
     updateUserProfile,

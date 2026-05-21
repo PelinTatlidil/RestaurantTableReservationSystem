@@ -1,10 +1,12 @@
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
+  const isLoginPage = pathname === '/login';
 
   const handleLogout = () => {
     logout();
@@ -59,25 +61,16 @@ const Navbar = () => {
               Logout
             </button>
           </>
-        ) : (
+        ) : !isLoginPage ? (
           <>
-            <NavLink to="/" className={linkClass}>
-              Home
-            </NavLink>
-            <NavLink to="/make-reservation" className={linkClass}>
-              Make Reservation
-            </NavLink>
-            <NavLink to="/my-reservations" className={linkClass}>
-              My Reservations
-            </NavLink>
-            <NavLink to="/login" className={linkClass}>
+            <NavLink to="/login" className="restaurant-button restaurant-nav-button h-[49px] px-6">
               Login
             </NavLink>
-            <NavLink to="/register" className="restaurant-button h-[49px] px-6">
+            <NavLink to="/register" className="restaurant-button restaurant-nav-button h-[49px] px-6">
               Register
             </NavLink>
           </>
-        )}
+        ) : null}
       </div>
     </nav>
   );

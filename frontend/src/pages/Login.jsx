@@ -29,7 +29,7 @@ const Login = () => {
       if (response.data.role === 'admin') {
         navigate('/admin-dashboard');
       } else {
-        navigate('/customer-panel');
+        navigate('/profile');
       }
     } catch (apiError) {
       setError(apiError.response?.data?.message || 'Login failed. Please try again.');
@@ -48,10 +48,12 @@ const Login = () => {
 
         {error && <p className="mb-4 text-red-600">{error}</p>}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
           <input
             type="email"
+            name="login-email"
             placeholder="Email"
+            autoComplete="off"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             className="restaurant-input"
@@ -59,7 +61,9 @@ const Login = () => {
 
           <input
             type="password"
+            name="login-password"
             placeholder="Password"
+            autoComplete="new-password"
             value={formData.password}
             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
             className="restaurant-input"

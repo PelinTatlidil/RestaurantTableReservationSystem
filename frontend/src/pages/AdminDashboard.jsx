@@ -5,7 +5,7 @@ const stats = [
     label: 'Total Reservations',
     value: '128',
     period: 'All time',
-    accent: 'bg-[#ede1d1] text-[#8a4f2c]',
+    accent: 'bg-[#dff7d4] text-[#016630]',
     icon: 'Cal',
   },
   {
@@ -107,7 +107,7 @@ const AdminDashboard = () => {
               <h2 className="font-serif text-3xl font-semibold text-stone-950">
                 Recent Reservations
               </h2>
-              <Link to="/my-reservations" className="text-lg font-semibold text-[#8a4f2c]">
+              <Link to="/my-reservations" className="text-lg font-semibold text-[#016630]">
                 View all reservations
               </Link>
             </div>

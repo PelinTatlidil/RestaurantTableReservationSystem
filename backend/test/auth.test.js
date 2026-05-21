@@ -21,19 +21,26 @@ describe('Auth API', () => {
         id: 'user-id-1',
         name: 'Jane',
         email: 'jane@example.com',
+        phone: '0400123456',
         role: 'customer',
       });
 
       const res = await chai
         .request(app)
         .post('/api/auth/register')
-        .send({ name: 'Jane', email: 'Jane@Example.com', password: 'secret123' });
+        .send({
+          name: 'Jane',
+          email: 'Jane@Example.com',
+          phone: '0400123456',
+          password: 'secret123',
+        });
 
       expect(res).to.have.status(201);
       expect(res.body).to.include({
         id: 'user-id-1',
         name: 'Jane',
         email: 'jane@example.com',
+        phone: '0400123456',
         role: 'customer',
       });
       expect(res.body.token).to.be.a('string');
@@ -45,20 +52,45 @@ describe('Auth API', () => {
       const res = await chai
         .request(app)
         .post('/api/auth/register')
-        .send({ name: 'Jane', email: 'jane@example.com', password: 'secret123' });
+        .send({
+          name: 'Jane',
+          email: 'jane@example.com',
+          phone: '0400123456',
+          password: 'secret123',
+        });
 
       expect(res).to.have.status(400);
-      expect(res.body.message).to.equal('User already exists with this email');
+      expect(res.body.message).to.equal('Email is already registered');
     });
 
     it('rejects short password', async () => {
       const res = await chai
         .request(app)
         .post('/api/auth/register')
-        .send({ name: 'Jane', email: 'jane@example.com', password: '123' });
+        .send({
+          name: 'Jane',
+          email: 'jane@example.com',
+          phone: '0400123456',
+          password: '123',
+        });
 
       expect(res).to.have.status(400);
       expect(res.body.message).to.equal('Password must be at least 6 characters long');
+    });
+
+    it('checks whether an email is already registered', async () => {
+      sinon.stub(User, 'exists').resolves({ _id: 'existing-user' });
+
+      const res = await chai
+        .request(app)
+        .get('/api/auth/check-email')
+        .query({ email: 'Jane@Example.com' });
+
+      expect(res).to.have.status(200);
+      expect(res.body).to.deep.equal({
+        exists: true,
+        message: 'Email address already exists',
+      });
     });
   });
 

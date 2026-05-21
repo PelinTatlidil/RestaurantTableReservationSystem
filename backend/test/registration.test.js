@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
 const User = require('../models/User');
-const { registerUser } = require('../controllers/authController');
+const { checkEmail, registerUser } = require('../controllers/authController');
 
 const createResponse = () => {
   const res = {
@@ -96,5 +96,34 @@ describe('Customer registration', () => {
       message: 'Registration successful',
     });
     expect(res.body.token).to.be.a('string');
+  });
+
+  it('reports that an email address already exists', async () => {
+    sinon.stub(User, 'exists').resolves({ _id: 'existing-user' });
+    const req = { query: { email: ' Pelin@Example.com ' } };
+    const res = createResponse();
+
+    await checkEmail(req, res);
+
+    expect(User.exists.calledWith({ email: 'pelin@example.com' })).to.equal(true);
+    expect(res.statusCode).to.equal(200);
+    expect(res.body).to.deep.equal({
+      exists: true,
+      message: 'Email address already exists',
+    });
+  });
+
+  it('reports that an email address is available', async () => {
+    sinon.stub(User, 'exists').resolves(null);
+    const req = { query: { email: 'new@example.com' } };
+    const res = createResponse();
+
+    await checkEmail(req, res);
+
+    expect(res.statusCode).to.equal(200);
+    expect(res.body).to.deep.equal({
+      exists: false,
+      message: 'Email address is available',
+    });
   });
 });
