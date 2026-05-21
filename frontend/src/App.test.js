@@ -147,6 +147,55 @@ describe('logout and protected access', () => {
   });
 });
 
+describe('restaurant information page', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+    }
+    if (container) {
+      document.body.removeChild(container);
+    }
+    root = null;
+    container = null;
+  });
+
+  test('customer can view restaurant details, opening hours, and booking policy', async () => {
+    axiosInstance.get.mockResolvedValue({
+      data: {
+        name: 'Digi Meat Restaurant',
+        address: {
+          street: '123 Food Street',
+          city: 'Brisbane',
+          state: 'QLD',
+          postcode: '4000',
+        },
+        contact: {
+          phone: '0400 123 456',
+          email: 'info@restaurant.com',
+        },
+        openingHours: ['Mon to Fri 11:00 AM to 10:00 PM', 'Sat to Sun 10:00 AM to 11:00 PM'],
+        bookingPolicy: 'Bookings are recommended and held for 15 minutes.',
+      },
+    });
+
+    await renderAppAt('/');
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/restaurant-info');
+      expect(container.textContent).toContain('Digi Meat Restaurant');
+      expect(container.textContent).toContain('123 Food Street');
+      expect(container.textContent).toContain('Phone: 0400 123 456');
+      expect(container.textContent).toContain('Mon to Fri 11:00 AM to 10:00 PM');
+      expect(container.textContent).toContain('Bookings are recommended and held for 15 minutes.');
+    });
+  });
+});
+
 describe('customer profile management', () => {
   beforeEach(() => {
     localStorage.clear();
