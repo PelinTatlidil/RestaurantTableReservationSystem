@@ -1,6 +1,3 @@
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 import { Link } from 'react-router-dom';
 
 const stats = [
@@ -80,7 +77,9 @@ const AdminDashboard = () => {
     <main className="restaurant-admin-page px-6 py-10">
       <section className="mx-auto max-w-[1376px]">
         <div className="mb-6">
-          <h1 className="font-serif text-5xl font-semibold text-stone-950">Admin Dashboard</h1>
+          <h1 className="font-serif text-5xl font-semibold text-stone-950">
+            Admin Dashboard
+          </h1>
         </div>
 
         <section className="grid gap-8 xl:grid-cols-4">
@@ -90,8 +89,12 @@ const AdminDashboard = () => {
                 {stat.icon}
               </div>
               <div>
-                <h2 className="text-xl font-semibold leading-snug text-stone-900">{stat.label}</h2>
-                <p className="mt-3 text-4xl font-semibold text-stone-950">{stat.value}</p>
+                <h2 className="text-xl font-semibold leading-snug text-stone-900">
+                  {stat.label}
+                </h2>
+                <p className="mt-3 text-4xl font-semibold text-stone-950">
+                  {stat.value}
+                </p>
                 <p className="mt-2 text-base text-stone-600">{stat.period}</p>
               </div>
             </article>
@@ -117,6 +120,7 @@ const AdminDashboard = () => {
                 <span>Guests</span>
                 <span>Status</span>
               </div>
+
               {reservations.map((reservation) => (
                 <div key={reservation.id} className="admin-dashboard-row">
                   <span>{reservation.id}</span>
@@ -124,7 +128,9 @@ const AdminDashboard = () => {
                   <span>{reservation.dateTime}</span>
                   <span>{reservation.guests}</span>
                   <span>
-                    <span className={statusClass[reservation.status]}>{reservation.status}</span>
+                    <span className={statusClass[reservation.status]}>
+                      {reservation.status}
+                    </span>
                   </span>
                 </div>
               ))}
@@ -132,16 +138,22 @@ const AdminDashboard = () => {
           </article>
 
           <aside className="admin-panel admin-actions">
-            <h2 className="font-serif text-3xl font-semibold text-stone-950">Quick Actions</h2>
+            <h2 className="font-serif text-3xl font-semibold text-stone-950">
+              Quick Actions
+            </h2>
+
             <Link to="/tasks" className="restaurant-button">
               Manage Tables
             </Link>
+
             <Link to="/my-reservations" className="restaurant-button restaurant-button-secondary">
               Manage Reservations
             </Link>
+
             <button type="button" className="restaurant-button restaurant-button-secondary">
               Manage Users
             </button>
+
             <button type="button" className="restaurant-button restaurant-button-secondary">
               Restaurant Info
             </button>
@@ -149,24 +161,6 @@ const AdminDashboard = () => {
         </section>
       </section>
     </main>
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-const AdminDashboard = () => {
-  return (
-    <div className="max-w-3xl mx-auto mt-16 p-6 bg-white rounded shadow">
-      <h1 className="text-2xl font-bold mb-2">Admin Dashboard</h1>
-      <p>Welcome! You are logged in as an administrator.</p>
-    </div>
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
   );
 };
 
