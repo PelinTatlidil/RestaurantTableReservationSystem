@@ -329,6 +329,19 @@
     padding: 0 2.5rem;
   }
 
+  .user-admin-row {
+    display: grid;
+    min-width: 1040px;
+    min-height: 72px;
+    grid-template-columns: 1.2fr 1.6fr 1.1fr 0.8fr 1.8fr;
+    align-items: center;
+    border-top: 1px solid rgba(69, 52, 38, 0.14);
+    color: #2a2119;
+    font-size: 1rem;
+    gap: 1rem;
+    padding: 0 1.5rem;
+  }
+
   .admin-dashboard-head {
     min-height: 64px;
     border-top: 0;
