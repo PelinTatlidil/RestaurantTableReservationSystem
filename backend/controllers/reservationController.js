@@ -6,6 +6,7 @@ const TimeSlot = require('../models/TimeSlot');
 const User = require('../models/User');
 
 const reservationStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'No-show'];
+const activeBookingStatuses = ['Pending', 'Confirmed'];
 
 const normalizeStatus = (status) => (status === 'Canceled' ? 'Cancelled' : status);
 
@@ -106,7 +107,8 @@ const getAdminReservations = async (req, res) => {
 const getCustomerReservations = async (req, res) => {
   try {
     const reservations = await Reservation.find({
-      $or: [{ customer: req.user._id }, { customerEmail: req.user.email }],
+      customer: req.user._id,
+      isDeleted: { $ne: true },
     })
       .populate('timeSlot', 'startTime endTime')
       .populate('table', 'tableNumber capacity location')
@@ -190,6 +192,315 @@ const reservationFieldsFromPayload = (payload, customer, reservationDate) => ({
   tablePreference: payload.tablePreference,
   requests: payload.requests,
 });
+
+const normalizeCustomerReservationPayload = (body) => ({
+  date: body.date ? body.date.trim() : '',
+  timeSlot: body.timeSlot || body.timeSlotId || '',
+  guests: Number(body.guests),
+  tablePreference: body.tablePreference ? body.tablePreference.trim() : '',
+  requests: body.requests ? body.requests.trim() : '',
+});
+
+const validateCustomerReservationPayload = ({ date, timeSlot, guests }) => {
+  if (!date) {
+    return 'Reservation date is required';
+  }
+
+  if (!timeSlot) {
+    return 'Time slot is required';
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(timeSlot)) {
+    return 'Selected time slot is invalid';
+  }
+
+  if (!Number.isInteger(guests) || guests < 1) {
+    return 'Guests must be a positive whole number';
+  }
+
+  return '';
+};
+
+const checkReservationAvailability = async ({ date, timeSlot, guests, excludeReservationId = null }) => {
+  const candidateTables = await Table.find({
+    isAvailable: true,
+    capacity: { $gte: guests },
+  }).sort({ capacity: 1, tableNumber: 1 });
+
+  if (!candidateTables.length) {
+    return {
+      available: false,
+      message: 'No tables have enough capacity for this guest count',
+      table: null,
+    };
+  }
+
+  const bookedReservationQuery = {
+    date,
+    timeSlot,
+    table: { $in: candidateTables.map((table) => table._id) },
+    status: { $in: activeBookingStatuses },
+    isDeleted: { $ne: true },
+  };
+
+  if (excludeReservationId) {
+    bookedReservationQuery._id = { $ne: excludeReservationId };
+  }
+
+  const bookedReservations = await Reservation.find(bookedReservationQuery).select('table status');
+
+  const bookedTableIds = new Set(
+    bookedReservations.map((reservation) => String(reservation.table))
+  );
+  const table = candidateTables.find((candidateTable) => !bookedTableIds.has(String(candidateTable._id)));
+
+  if (!table) {
+    return {
+      available: false,
+      message: 'No tables are available for this date, time, and guest count',
+      table: null,
+    };
+  }
+
+  return {
+    available: true,
+    message: 'A table is available for this reservation',
+    table,
+  };
+};
+
+const findSuitableAvailableTable = async ({ date, timeSlot, guests, excludeReservationId = null }) => {
+  const availability = await checkReservationAvailability({
+    date,
+    timeSlot,
+    guests,
+    excludeReservationId,
+  });
+
+  return availability.table;
+};
+
+const checkCustomerReservationAvailability = async (req, res) => {
+  const payload = normalizeCustomerReservationPayload(req.query);
+  const validationMessage = validateCustomerReservationPayload(payload);
+
+  if (validationMessage) {
+    return res.status(400).json({ available: false, message: validationMessage });
+  }
+
+  try {
+    const timeSlot = await TimeSlot.findById(payload.timeSlot);
+
+    if (!timeSlot) {
+      return res.status(404).json({ available: false, message: 'Time slot not found' });
+    }
+
+    if (!timeSlot.isAvailable) {
+      return res.status(200).json({
+        available: false,
+        message: 'Selected time slot is not available',
+      });
+    }
+
+    const reservationDate = new Date(`${payload.date}T00:00:00.000Z`);
+
+    if (Number.isNaN(reservationDate.getTime())) {
+      return res.status(400).json({ available: false, message: 'Reservation date is invalid' });
+    }
+
+    const availability = await checkReservationAvailability({
+      date: reservationDate,
+      timeSlot: payload.timeSlot,
+      guests: payload.guests,
+    });
+
+    return res.status(200).json({
+      available: availability.available,
+      message: availability.message,
+      table: availability.table
+        ? {
+            _id: availability.table._id,
+            tableNumber: availability.table.tableNumber,
+            capacity: availability.table.capacity,
+            location: availability.table.location,
+          }
+        : null,
+    });
+  } catch (error) {
+    return res.status(500).json({ available: false, message: reservationErrorMessage(error) });
+  }
+};
+
+const createCustomerReservation = async (req, res) => {
+  const payload = normalizeCustomerReservationPayload(req.body);
+  const validationMessage = validateCustomerReservationPayload(payload);
+
+  if (validationMessage) {
+    return res.status(400).json({ message: validationMessage });
+  }
+
+  try {
+    const timeSlot = await TimeSlot.findById(payload.timeSlot);
+
+    if (!timeSlot) {
+      return res.status(404).json({ message: 'Time slot not found' });
+    }
+
+    if (!timeSlot.isAvailable) {
+      return res.status(400).json({ message: 'Selected time slot is not available' });
+    }
+
+    const reservationDate = new Date(`${payload.date}T00:00:00.000Z`);
+
+    if (Number.isNaN(reservationDate.getTime())) {
+      return res.status(400).json({ message: 'Reservation date is invalid' });
+    }
+
+    const table = await findSuitableAvailableTable({
+      date: reservationDate,
+      timeSlot: payload.timeSlot,
+      guests: payload.guests,
+    });
+
+    if (!table) {
+      return res.status(400).json({
+        message: 'No tables are available for this date, time, and guest count',
+      });
+    }
+
+    const reservation = await Reservation.create({
+      customer: req.user._id,
+      customerName: req.user.name,
+      customerEmail: req.user.email,
+      customerPhone: req.user.phone,
+      date: reservationDate,
+      timeSlot: payload.timeSlot,
+      table: table._id,
+      guests: payload.guests,
+      status: 'Confirmed',
+      tablePreference: payload.tablePreference,
+      requests: payload.requests,
+    });
+    const populatedReservation = await populateReservationById(reservation._id);
+
+    return res.status(201).json({
+      message: 'Reservation confirmed successfully',
+      reservation: populatedReservation,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: reservationErrorMessage(error) });
+  }
+};
+
+const updateCustomerReservation = async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ message: 'Reservation ID is invalid' });
+  }
+
+  const payload = normalizeCustomerReservationPayload(req.body);
+  const validationMessage = validateCustomerReservationPayload(payload);
+
+  if (validationMessage) {
+    return res.status(400).json({ message: validationMessage });
+  }
+
+  try {
+    const reservation = await Reservation.findById(req.params.id);
+
+    if (!reservation || reservation.isDeleted) {
+      return res.status(404).json({ message: 'Reservation not found' });
+    }
+
+    if (String(reservation.customer) !== String(req.user._id)) {
+      return res.status(403).json({ message: 'You can only update your own reservations' });
+    }
+
+    const timeSlot = await TimeSlot.findById(payload.timeSlot);
+
+    if (!timeSlot) {
+      return res.status(404).json({ message: 'Time slot not found' });
+    }
+
+    if (!timeSlot.isAvailable) {
+      return res.status(400).json({ message: 'Selected time slot is not available' });
+    }
+
+    const reservationDate = new Date(`${payload.date}T00:00:00.000Z`);
+
+    if (Number.isNaN(reservationDate.getTime())) {
+      return res.status(400).json({ message: 'Reservation date is invalid' });
+    }
+
+    const table = await findSuitableAvailableTable({
+      date: reservationDate,
+      timeSlot: payload.timeSlot,
+      guests: payload.guests,
+      excludeReservationId: reservation._id,
+    });
+
+    if (!table) {
+      return res.status(400).json({
+        message: 'No tables are available for this date, time, and guest count',
+      });
+    }
+
+    reservation.date = reservationDate;
+    reservation.timeSlot = payload.timeSlot;
+    reservation.table = table._id;
+    reservation.guests = payload.guests;
+    reservation.status = 'Confirmed';
+    reservation.tablePreference = payload.tablePreference;
+    reservation.requests = payload.requests;
+    reservation.customerNotification = {
+      message: 'Your reservation has been updated successfully.',
+      updatedAt: new Date(),
+    };
+
+    const updatedReservation = await reservation.save();
+    const populatedReservation = await populateReservationById(updatedReservation._id);
+
+    return res.status(200).json({
+      message: 'Reservation updated successfully',
+      reservation: populatedReservation,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: reservationErrorMessage(error) });
+  }
+};
+
+const cancelCustomerReservation = async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ message: 'Reservation ID is invalid' });
+  }
+
+  try {
+    const reservation = await Reservation.findById(req.params.id);
+
+    if (!reservation || reservation.isDeleted) {
+      return res.status(404).json({ message: 'Reservation not found' });
+    }
+
+    if (String(reservation.customer) !== String(req.user._id)) {
+      return res.status(403).json({ message: 'You can only cancel your own reservations' });
+    }
+
+    reservation.status = 'Cancelled';
+    reservation.customerNotification = {
+      message: 'Your reservation has been cancelled.',
+      updatedAt: new Date(),
+    };
+
+    const cancelledReservation = await reservation.save();
+    const populatedReservation = await populateReservationById(cancelledReservation._id);
+
+    return res.status(200).json({
+      message: 'Reservation cancelled successfully',
+      reservation: populatedReservation,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: reservationErrorMessage(error) });
+  }
+};
 
 const createAdminReservation = async (req, res) => {
   const payload = normalizeReservationPayload(req.body);
@@ -366,12 +677,19 @@ const updateReservationStatus = async (req, res) => {
 };
 
 module.exports = {
+  cancelCustomerReservation,
+  checkCustomerReservationAvailability,
+  checkReservationAvailability,
   createAdminReservation,
+  createCustomerReservation,
   deleteAdminReservation,
+  findSuitableAvailableTable,
   getAdminReservations,
   getCustomerReservations,
   recoverAdminReservation,
   updateAdminReservation,
+  updateCustomerReservation,
   updateReservationStatus,
+  validateCustomerReservationPayload,
   validateReservationPayload,
 };

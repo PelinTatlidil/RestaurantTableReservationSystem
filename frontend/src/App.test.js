@@ -1908,6 +1908,171 @@ describe('customer reservation time slots', () => {
 
     expect(container.querySelector('select').value).toBe('slot-1');
   });
+
+  test('customer can create a confirmed reservation and see confirmation details', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'slot-1',
+            startTime: '18:00',
+            endTime: '19:00',
+            isAvailable: true,
+          },
+        ],
+      })
+      .mockResolvedValue({
+        data: {
+          available: true,
+          message: 'A table is available for this reservation',
+          table: {
+            _id: 'table-2',
+            tableNumber: 2,
+            capacity: 4,
+            location: 'Window',
+          },
+        },
+      });
+    axiosInstance.post.mockResolvedValue({
+      data: {
+        message: 'Reservation confirmed successfully',
+        reservation: {
+          _id: '507f1f77bcf86cd799439013',
+          date: '2026-05-31T00:00:00.000Z',
+          timeSlot: { startTime: '18:00', endTime: '19:00' },
+          table: { tableNumber: 2, capacity: 4 },
+          guests: 4,
+          status: 'Confirmed',
+          requests: 'Window seat',
+        },
+      },
+    });
+
+    await renderAppAt('/make-reservation');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('18:00 - 19:00');
+    });
+
+    await act(async () => {
+      const inputs = container.querySelectorAll('form input');
+      changeInputValue(inputs[0], '2026-05-31');
+      changeSelectValue(container.querySelector('select'), 'slot-1');
+      changeInputValue(inputs[1], '4');
+      changeInputValue(inputs[2], 'Window');
+      changeInputValue(container.querySelector('textarea'), 'Window seat');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/reservations/availability', {
+        headers: { Authorization: 'Bearer customer-token' },
+        params: {
+          date: '2026-05-31',
+          timeSlotId: 'slot-1',
+          guests: 4,
+        },
+      });
+      expect(axiosInstance.post).toHaveBeenCalledWith(
+        '/api/reservations',
+        {
+          date: '2026-05-31',
+          timeSlotId: 'slot-1',
+          guests: 4,
+          tablePreference: 'Window',
+          requests: 'Window seat',
+        },
+        {
+          headers: { Authorization: 'Bearer customer-token' },
+        }
+      );
+      expect(container.textContent).toContain('Reservation Confirmed');
+      expect(container.textContent).toContain('Reservation confirmed successfully');
+      expect(container.textContent).toContain('18:00 - 19:00');
+      expect(container.textContent).toContain('Table 2 (4 guests)');
+      expect(container.textContent).toContain('Confirmed');
+    });
+  });
+
+  test('customer sees unavailable reservation errors without leaving the form', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'slot-1',
+            startTime: '18:00',
+            endTime: '19:00',
+            isAvailable: true,
+          },
+        ],
+      })
+      .mockResolvedValue({
+        data: {
+          available: false,
+          message: 'No tables are available for this date, time, and guest count',
+          table: null,
+        },
+      });
+    axiosInstance.post.mockRejectedValue({
+      response: {
+        data: {
+          message: 'No tables are available for this date, time, and guest count',
+        },
+      },
+    });
+
+    await renderAppAt('/make-reservation');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('18:00 - 19:00');
+    });
+
+    await act(async () => {
+      const inputs = container.querySelectorAll('form input');
+      changeInputValue(inputs[0], '2026-05-31');
+      changeSelectValue(container.querySelector('select'), 'slot-1');
+      changeInputValue(inputs[1], '8');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/reservations/availability', {
+        headers: { Authorization: 'Bearer customer-token' },
+        params: {
+          date: '2026-05-31',
+          timeSlotId: 'slot-1',
+          guests: 8,
+        },
+      });
+      expect(container.textContent).toContain(
+        'No tables are available for this date, time, and guest count'
+      );
+      expect(container.textContent).toContain('Make a Reservation');
+      expect(container.textContent).not.toContain('Reservation Confirmed');
+    });
+  });
 });
 
 describe('customer reservation status view', () => {
@@ -1961,10 +2126,314 @@ describe('customer reservation status view', () => {
       expect(axiosInstance.get).toHaveBeenCalledWith('/api/reservations/my', {
         headers: { Authorization: 'Bearer customer-token' },
       });
+      expect(container.querySelector('[role="table"]')).toBeTruthy();
+      expect(container.textContent).toContain('31 May 2026');
+      expect(container.textContent).toContain('18:00 - 19:00');
+      expect(container.textContent).toContain('2');
+      expect(container.textContent).toContain('Table 1');
       expect(container.textContent).toContain('Completed');
       expect(container.textContent).toContain(
         'Your reservation status has been updated to Completed.'
       );
+    });
+  });
+
+  test('customer sees an empty message when they have no reservations', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get.mockResolvedValue({ data: [] });
+
+    await renderAppAt('/my-reservations');
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/reservations/my', {
+        headers: { Authorization: 'Bearer customer-token' },
+      });
+      expect(container.textContent).toContain('You do not have any reservations yet.');
+    });
+  });
+
+  test('customer can update one of their existing reservations', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: '507f1f77bcf86cd799439013',
+            date: '2026-05-31T00:00:00.000Z',
+            timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+            table: { tableNumber: 1 },
+            guests: 2,
+            status: 'Confirmed',
+            tablePreference: 'Window',
+            requests: 'Birthday',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+          { _id: 'slot-2', startTime: '19:00', endTime: '20:00' },
+        ],
+      });
+    axiosInstance.put.mockResolvedValue({
+      data: {
+        message: 'Reservation updated successfully',
+        reservation: {
+          _id: '507f1f77bcf86cd799439013',
+          date: '2026-06-01T00:00:00.000Z',
+          timeSlot: { _id: 'slot-2', startTime: '19:00', endTime: '20:00' },
+          table: { tableNumber: 3 },
+          guests: 4,
+          status: 'Confirmed',
+          tablePreference: 'Patio',
+          requests: 'Anniversary',
+        },
+      },
+    });
+
+    await renderAppAt('/my-reservations');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('31 May 2026');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Update')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Update Reservation');
+      expect(container.querySelector('form input[type="date"]').value).toBe('2026-05-31');
+    });
+
+    await act(async () => {
+      const form = container.querySelector('form');
+      const inputs = form.querySelectorAll('input');
+      const select = form.querySelector('select');
+      changeInputValue(inputs[0], '2026-06-01');
+      changeSelectValue(select, 'slot-2');
+      changeInputValue(inputs[1], '4');
+      changeInputValue(inputs[2], 'Patio');
+      changeInputValue(form.querySelector('textarea'), 'Anniversary');
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.put).toHaveBeenCalledWith(
+        '/api/reservations/507f1f77bcf86cd799439013',
+        {
+          date: '2026-06-01',
+          timeSlotId: 'slot-2',
+          guests: 4,
+          tablePreference: 'Patio',
+          requests: 'Anniversary',
+        },
+        {
+          headers: { Authorization: 'Bearer customer-token' },
+        }
+      );
+      expect(container.textContent).toContain('Reservation updated successfully');
+      expect(container.textContent).toContain('01 June 2026');
+      expect(container.textContent).toContain('19:00 - 20:00');
+      expect(container.textContent).toContain('Table 3');
+    });
+  });
+
+  test('customer sees an error when updated reservation details are unavailable', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: '507f1f77bcf86cd799439013',
+            date: '2026-05-31T00:00:00.000Z',
+            timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+            table: { tableNumber: 1 },
+            guests: 2,
+            status: 'Confirmed',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [{ _id: 'slot-1', startTime: '18:00', endTime: '19:00' }],
+      });
+    axiosInstance.put.mockRejectedValue({
+      response: {
+        data: { message: 'No tables are available for this date, time, and guest count' },
+      },
+    });
+
+    await renderAppAt('/my-reservations');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('31 May 2026');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Update')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      const form = container.querySelector('form');
+      const inputs = form.querySelectorAll('input');
+      changeInputValue(inputs[1], '8');
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(container.textContent).toContain(
+        'No tables are available for this date, time, and guest count'
+      );
+      expect(container.textContent).toContain('Update Reservation');
+    });
+  });
+
+  test('customer can cancel one of their existing reservations after confirmation', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get.mockResolvedValue({
+      data: [
+        {
+          _id: '507f1f77bcf86cd799439013',
+          date: '2026-05-31T00:00:00.000Z',
+          timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+          table: { tableNumber: 1 },
+          guests: 2,
+          status: 'Confirmed',
+        },
+      ],
+    });
+    axiosInstance.patch.mockResolvedValue({
+      data: {
+        message: 'Reservation cancelled successfully',
+        reservation: {
+          _id: '507f1f77bcf86cd799439013',
+          date: '2026-05-31T00:00:00.000Z',
+          timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+          table: { tableNumber: 1 },
+          guests: 2,
+          status: 'Cancelled',
+          customerNotification: {
+            message: 'Your reservation has been cancelled.',
+          },
+        },
+      },
+    });
+
+    await renderAppAt('/my-reservations');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('31 May 2026');
+      expect(container.textContent).toContain('Confirmed');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.getAttribute('aria-label') === 'Cancel reservation on 31 May 2026')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Cancel your reservation on');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Cancel Reservation')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.patch).toHaveBeenCalledWith(
+        '/api/reservations/507f1f77bcf86cd799439013/cancel',
+        {},
+        {
+          headers: { Authorization: 'Bearer customer-token' },
+        }
+      );
+      expect(container.textContent).toContain('Reservation cancelled successfully');
+      expect(container.textContent).toContain('Cancelled');
+      expect(container.textContent).toContain('Your reservation has been cancelled.');
+    });
+  });
+
+  test('admin cannot access customer my reservations page', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+    axiosInstance.get.mockResolvedValue({
+      data: {
+        name: 'Digi Meat Restaurant',
+        address: {
+          street: '123 Food Street',
+          city: 'Brisbane',
+          state: 'QLD',
+          postcode: '4000',
+        },
+        contact: {
+          phone: '0400 123 456',
+          email: 'info@restaurant.com',
+        },
+        openingHours: ['Mon to Fri 11:00 AM to 10:00 PM'],
+        bookingPolicy: 'Bookings are recommended.',
+      },
+    });
+
+    await renderAppAt('/my-reservations');
+
+    await waitFor(() => {
+      expect(container.textContent).not.toContain('My Reservations');
+      expect(container.textContent).toContain('Digi Meat Restaurant');
     });
   });
 });
@@ -2020,6 +2489,9 @@ describe('customer profile management', () => {
     await renderAppAt('/profile');
 
     await waitFor(() => {
+      expect(container.textContent).toContain('Name');
+      expect(container.textContent).toContain('Email');
+      expect(container.textContent).toContain('Phone');
       expect(container.querySelector('input[placeholder="Name"]').value).toBe('Pelin');
       expect(container.querySelector('input[placeholder="Phone"]').value).toBe('0400123456');
     });
@@ -2046,6 +2518,77 @@ describe('customer profile management', () => {
         }
       );
       expect(container.textContent).toContain('Profile updated successfully');
+    });
+  });
+
+  test('customer dashboard shows reservation list instead of navigation tiles', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Pelin',
+        email: 'pelin@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: {
+          name: 'Pelin',
+          email: 'pelin@example.com',
+          phone: '0400123456',
+          role: 'customer',
+        },
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'reservation-1',
+            date: '2026-05-31T00:00:00.000Z',
+            timeSlot: { startTime: '18:00', endTime: '19:00' },
+            table: { tableNumber: 2 },
+            guests: 4,
+            status: 'Confirmed',
+            tablePreference: 'Window',
+            requests: 'Birthday',
+            customerNotification: {
+              message: 'Your reservation is confirmed.',
+            },
+          },
+        ],
+      });
+
+    await renderAppAt('/profile');
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/reservations/my', {
+        headers: { Authorization: 'Bearer customer-token' },
+      });
+      expect(container.querySelector('[role="table"]')).toBeTruthy();
+      expect(container.textContent).toContain('31 May 2026');
+      expect(container.textContent).toContain('18:00 - 19:00');
+      expect(container.textContent).toContain('Table 2');
+      expect(container.textContent).toContain('Confirmed');
+      expect(container.textContent).not.toContain('Book now');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.getAttribute('aria-label') === 'View details for reservation on 31 May 2026')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/profile');
+      expect(container.textContent).toContain('Reservation Details');
+      expect(container.textContent).toContain('Date: 31 May 2026');
+      expect(container.textContent).toContain('Time: 18:00 - 19:00');
+      expect(container.textContent).toContain('Guests: 4');
+      expect(container.textContent).toContain('Table Preference: Window');
+      expect(container.textContent).toContain('Special Requests: Birthday');
+      expect(container.textContent).toContain('Notification: Your reservation is confirmed.');
     });
   });
 });

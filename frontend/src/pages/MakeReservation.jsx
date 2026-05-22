@@ -14,6 +14,8 @@ const MakeReservation = () => {
     requests: '',
   });
   const [timeSlots, setTimeSlots] = useState([]);
+  const [availability, setAvailability] = useState(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
@@ -34,15 +36,105 @@ const MakeReservation = () => {
     fetchAvailableTimeSlots();
   }, [user]);
 
-  const handleSubmit = (event) => {
+  useEffect(() => {
+    const guestCount = Number(formData.guests);
+
+    if (
+      !formData.date ||
+      !formData.timeSlotId ||
+      !Number.isInteger(guestCount) ||
+      guestCount < 1
+    ) {
+      setAvailability(null);
+      return;
+    }
+
+    let isActive = true;
+
+    const checkAvailability = async () => {
+      setCheckingAvailability(true);
+
+      try {
+        const response = await axiosInstance.get('/api/reservations/availability', {
+          headers: { Authorization: `Bearer ${user.token}` },
+          params: {
+            date: formData.date,
+            timeSlotId: formData.timeSlotId,
+            guests: guestCount,
+          },
+        });
+
+        if (isActive) {
+          setAvailability(response.data);
+        }
+      } catch (error) {
+        if (isActive) {
+          setAvailability({
+            available: false,
+            message: error.response?.data?.message || 'Availability could not be checked.',
+          });
+        }
+      } finally {
+        if (isActive) {
+          setCheckingAvailability(false);
+        }
+      }
+    };
+
+    checkAvailability();
+
+    return () => {
+      isActive = false;
+    };
+  }, [formData.date, formData.guests, formData.timeSlotId, user.token]);
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    setMessage({ type: '', text: '' });
+
+    if (!formData.date) {
+      setMessage({ type: 'error', text: 'Please select a reservation date.' });
+      return;
+    }
 
     if (!formData.timeSlotId) {
       setMessage({ type: 'error', text: 'Please select an available time slot.' });
       return;
     }
 
-    navigate('/reservation-confirmation');
+    const guestCount = Number(formData.guests);
+    if (!Number.isInteger(guestCount) || guestCount < 1) {
+      setMessage({ type: 'error', text: 'Guests must be a positive whole number.' });
+      return;
+    }
+
+    try {
+      const response = await axiosInstance.post(
+        '/api/reservations',
+        {
+          date: formData.date,
+          timeSlotId: formData.timeSlotId,
+          guests: guestCount,
+          tablePreference: formData.tablePreference,
+          requests: formData.requests,
+        },
+        {
+          headers: { Authorization: `Bearer ${user.token}` },
+        }
+      );
+
+      navigate('/reservation-confirmation', {
+        state: {
+          reservation: response.data.reservation,
+          message: response.data.message,
+        },
+      });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Reservation could not be created.',
+      });
+    }
   };
 
   return (
@@ -120,6 +212,27 @@ const MakeReservation = () => {
               }
             >
               {message.text}
+            </p>
+          )}
+
+          {checkingAvailability && (
+            <p className="restaurant-message-success">
+              Checking table availability...
+            </p>
+          )}
+
+          {availability && !checkingAvailability && (
+            <p
+              className={
+                availability.available
+                  ? 'restaurant-message-success'
+                  : 'restaurant-message-error'
+              }
+            >
+              {availability.message}
+              {availability.available && availability.table
+                ? ` Table ${availability.table.tableNumber} can accommodate ${availability.table.capacity} guests.`
+                : ''}
             </p>
           )}
 
