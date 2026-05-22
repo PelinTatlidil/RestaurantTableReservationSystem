@@ -353,6 +353,379 @@ describe('admin dashboard access and navigation', () => {
   });
 });
 
+describe('admin user management', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+    }
+    if (container) {
+      document.body.removeChild(container);
+    }
+    root = null;
+    container = null;
+  });
+
+  const setAdminSession = () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+  };
+
+  test('admin can view registered users and open user details', async () => {
+    setAdminSession();
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: {
+          users: [
+            {
+              _id: '507f1f77bcf86cd799439011',
+              name: 'Pelin Tatlidil',
+              email: 'pelin@example.com',
+              phone: '0400123456',
+              role: 'customer',
+            },
+            {
+              _id: '507f1f77bcf86cd799439012',
+              name: 'Admin A',
+              email: 'admin@example.com',
+              phone: '0400654321',
+              role: 'admin',
+            },
+          ],
+          total: 2,
+          page: 1,
+          pages: 1,
+          limit: 10,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          _id: '507f1f77bcf86cd799439011',
+          name: 'Pelin Tatlidil',
+          email: 'pelin@example.com',
+          phone: '0400123456',
+          role: 'customer',
+          university: 'QUT',
+          address: 'Brisbane',
+        },
+      });
+
+    await renderAppAt('/admin/users');
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/users/admin', {
+        headers: { Authorization: 'Bearer admin-token' },
+        params: {
+          page: 1,
+          limit: 10,
+          search: '',
+          sortBy: 'name',
+          sortOrder: 'asc',
+        },
+      });
+      expect(container.textContent).toContain('User Management');
+      expect(container.textContent).toContain('Pelin Tatlidil');
+      expect(container.textContent).toContain('pelin@example.com');
+      expect(container.textContent).toContain('0400123456');
+      expect(container.textContent).toContain('customer');
+      expect(container.textContent).toContain('Admin A');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('.user-admin-row:not(.restaurant-admin-head)'))
+        .find((row) => row.textContent.includes('Pelin Tatlidil'))
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith(
+        '/api/users/admin/507f1f77bcf86cd799439011',
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('User Details');
+      expect(container.textContent).toContain('University: QUT');
+      expect(container.textContent).toContain('Address: Brisbane');
+    });
+  });
+
+  test('admin can search, sort, and paginate user list', async () => {
+    setAdminSession();
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: {
+          users: [
+            {
+              _id: '507f1f77bcf86cd799439011',
+              name: 'Customer A',
+              email: 'customer@example.com',
+              phone: '0400123456',
+              role: 'customer',
+            },
+          ],
+          total: 11,
+          page: 1,
+          pages: 2,
+          limit: 10,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          users: [
+            {
+              _id: '507f1f77bcf86cd799439012',
+              name: 'Customer B',
+              email: 'customerb@example.com',
+              phone: '0400654321',
+              role: 'customer',
+            },
+          ],
+          total: 11,
+          page: 2,
+          pages: 2,
+          limit: 10,
+        },
+      })
+      .mockResolvedValue({
+        data: {
+          users: [],
+          total: 0,
+          page: 1,
+          pages: 1,
+          limit: 10,
+        },
+      });
+
+    await renderAppAt('/admin/users');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Customer A');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Next')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenLastCalledWith('/api/users/admin', {
+        headers: { Authorization: 'Bearer admin-token' },
+        params: {
+          page: 2,
+          limit: 10,
+          search: '',
+          sortBy: 'name',
+          sortOrder: 'asc',
+        },
+      });
+      expect(container.textContent).toContain('Customer B');
+    });
+
+    await act(async () => {
+      changeInputValue(container.querySelector('input[type="search"]'), 'admin');
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenLastCalledWith('/api/users/admin', {
+        headers: { Authorization: 'Bearer admin-token' },
+        params: {
+          page: 1,
+          limit: 10,
+          search: 'admin',
+          sortBy: 'name',
+          sortOrder: 'asc',
+        },
+      });
+      expect(container.textContent).toContain('No users match your search.');
+    });
+
+    await act(async () => {
+      changeSelectValue(container.querySelector('select[aria-label="Sort users by"]'), 'email');
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenLastCalledWith('/api/users/admin', {
+        headers: { Authorization: 'Bearer admin-token' },
+        params: {
+          page: 1,
+          limit: 10,
+          search: 'admin',
+          sortBy: 'email',
+          sortOrder: 'asc',
+        },
+      });
+    });
+  });
+
+  test('admin can edit and delete users', async () => {
+    setAdminSession();
+    axiosInstance.get.mockResolvedValue({
+      data: {
+        users: [
+          {
+            _id: '507f1f77bcf86cd799439011',
+            name: 'Customer A',
+            email: 'customer@example.com',
+            phone: '0400123456',
+            role: 'customer',
+            university: '',
+            address: '',
+          },
+        ],
+        total: 1,
+        page: 1,
+        pages: 1,
+        limit: 10,
+      },
+    });
+    axiosInstance.put.mockResolvedValue({
+      data: {
+        _id: '507f1f77bcf86cd799439011',
+        name: 'Updated Customer',
+        email: 'updated@example.com',
+        phone: '0400999888',
+        role: 'admin',
+        university: 'QUT',
+        address: 'Brisbane',
+        message: 'User updated successfully',
+      },
+    });
+    axiosInstance.delete.mockResolvedValue({
+      data: { message: 'User deleted successfully' },
+    });
+
+    await renderAppAt('/admin/users');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Customer A');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.getAttribute('aria-label') === 'Edit Customer A')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      const form = container.querySelector('form');
+      const inputs = form.querySelectorAll('input');
+      const roleSelect = form.querySelector('select');
+      changeInputValue(inputs[0], 'Updated Customer');
+      changeInputValue(inputs[1], 'Updated@Example.com');
+      changeInputValue(inputs[2], '0400999888');
+      changeSelectValue(roleSelect, 'admin');
+      changeInputValue(inputs[3], 'QUT');
+      changeInputValue(inputs[4], 'Brisbane');
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.put).toHaveBeenCalledWith(
+        '/api/users/admin/507f1f77bcf86cd799439011',
+        {
+          name: 'Updated Customer',
+          email: 'Updated@Example.com',
+          phone: '0400999888',
+          role: 'admin',
+          university: 'QUT',
+          address: 'Brisbane',
+        },
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('User updated successfully.');
+      expect(container.textContent).toContain('Updated Customer');
+      expect(container.textContent).toContain('updated@example.com');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.getAttribute('aria-label') === 'Delete Updated Customer')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Delete user account for Updated Customer?');
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .filter((button) => button.textContent === 'Delete')
+        .at(-1)
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.delete).toHaveBeenCalledWith(
+        '/api/users/admin/507f1f77bcf86cd799439011',
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('User deleted successfully.');
+      expect(container.textContent).toContain('No registered users were found.');
+    });
+  });
+
+  test('user management shows API errors and empty state', async () => {
+    setAdminSession();
+    axiosInstance.get.mockRejectedValueOnce({
+      response: {
+        data: { message: 'Admin access required' },
+      },
+    });
+
+    await renderAppAt('/admin/users');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Admin access required');
+      expect(container.textContent).toContain('No registered users were found.');
+    });
+  });
+
+  test('customer cannot access admin user management', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get.mockResolvedValue({
+      data: {
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+      },
+    });
+
+    await renderAppAt('/admin/users');
+
+    await waitFor(() => {
+      expect(container.textContent).not.toContain('User Management');
+      expect(container.textContent).toContain('Manage your restaurant bookings');
+    });
+  });
+});
+
 describe('admin table management', () => {
   beforeEach(() => {
     localStorage.clear();

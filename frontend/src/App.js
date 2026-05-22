@@ -14,6 +14,7 @@ import CustomerPanel from './pages/CustomerPanel';
 import AdminManagementPage from './pages/AdminManagementPage';
 import ManageTimeSlots from './pages/ManageTimeSlots';
 import AdminReservations from './pages/AdminReservations';
+import AdminUsers from './pages/AdminUsers';
 
 const RequireRole = ({ children, role }) => {
   const { user } = useAuth();
@@ -81,10 +82,7 @@ function App() {
           path="/admin/users"
           element={
             <RequireRole role="admin">
-              <AdminManagementPage
-                title="User Management"
-                description="Manage customer and admin user accounts."
-              />
+              <AdminUsers />
             </RequireRole>
           }
         />
