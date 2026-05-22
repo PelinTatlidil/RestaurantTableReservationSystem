@@ -13,6 +13,7 @@ import ReservationConfirmation from './pages/ReservationConfirmation';
 import CustomerPanel from './pages/CustomerPanel';
 import AdminManagementPage from './pages/AdminManagementPage';
 import ManageTimeSlots from './pages/ManageTimeSlots';
+import AdminReservations from './pages/AdminReservations';
 
 const RequireRole = ({ children, role }) => {
   const { user } = useAuth();
@@ -72,10 +73,7 @@ function App() {
           path="/admin/reservations"
           element={
             <RequireRole role="admin">
-              <AdminManagementPage
-                title="Reservation Management"
-                description="Review, update, and manage customer reservations."
-              />
+              <AdminReservations />
             </RequireRole>
           }
         />

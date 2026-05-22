@@ -131,6 +131,7 @@
 
   .restaurant-input,
   .restaurant-field input,
+  .restaurant-field select,
   .restaurant-field textarea {
     min-height: 82px;
     width: 100%;
@@ -151,6 +152,7 @@
 
   .restaurant-input:focus,
   .restaurant-field input:focus,
+  .restaurant-field select:focus,
   .restaurant-field textarea:focus {
     border-color: #016630;
     box-shadow: 0 0 0 4px rgba(1, 102, 48, 0.12);
@@ -289,6 +291,42 @@
     color: #2a2119;
     font-size: 1rem;
     padding: 0 1.5rem;
+  }
+
+  .reservation-admin-row {
+    display: grid;
+    min-width: 1240px;
+    min-height: 72px;
+    grid-template-columns: 1.4fr 1.1fr 1.2fr 0.6fr 0.9fr 0.9fr 1.6fr;
+    align-items: center;
+    border-top: 1px solid rgba(69, 52, 38, 0.14);
+    color: #2a2119;
+    font-size: 1rem;
+    padding: 0 1.5rem;
+  }
+
+  .table-admin-row {
+    display: grid;
+    min-width: 860px;
+    min-height: 72px;
+    grid-template-columns: 1fr 1fr 1.6fr 1.4fr;
+    align-items: center;
+    border-top: 1px solid rgba(69, 52, 38, 0.14);
+    color: #2a2119;
+    font-size: 1.25rem;
+    padding: 0 2.5rem;
+  }
+
+  .time-slot-admin-row {
+    display: grid;
+    min-width: 760px;
+    min-height: 72px;
+    grid-template-columns: 1fr 1fr 1.4fr;
+    align-items: center;
+    border-top: 1px solid rgba(69, 52, 38, 0.14);
+    color: #2a2119;
+    font-size: 1.25rem;
+    padding: 0 2.5rem;
   }
 
   .admin-dashboard-head {

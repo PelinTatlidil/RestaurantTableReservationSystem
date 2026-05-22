@@ -258,12 +258,64 @@ describe('admin dashboard access and navigation', () => {
         token: 'admin-token',
       })
     );
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'reservation-1',
+            customerName: 'Live Customer',
+            customerEmail: 'live@example.com',
+            customerPhone: '0400111222',
+            date: '2026-05-31T00:00:00.000Z',
+            timeSlot: { startTime: '18:00', endTime: '19:00' },
+            guests: 2,
+            status: 'Confirmed',
+          },
+          {
+            _id: 'reservation-2',
+            customerName: 'Pending Customer',
+            customerEmail: 'pending@example.com',
+            customerPhone: '0400333444',
+            date: '2026-06-01T00:00:00.000Z',
+            timeSlot: { startTime: '19:00', endTime: '20:00' },
+            guests: 4,
+            status: 'Pending',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          { _id: 'table-1', tableNumber: 1, capacity: 4, location: 'Indoor', isAvailable: true },
+          { _id: 'table-2', tableNumber: 2, capacity: 2, location: 'Patio', isAvailable: false },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          { _id: 'slot-1', startTime: '18:00', endTime: '19:00', isAvailable: true },
+          { _id: 'slot-2', startTime: '19:00', endTime: '20:00', isAvailable: false },
+        ],
+      });
 
     await renderAppAt('/admin-dashboard');
 
-    expect(container.textContent).toContain('Admin Dashboard');
-    expect(container.textContent).toContain('Total Reservations');
-    expect(container.textContent).toContain('Open Time Slots');
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/reservations/admin', {
+        headers: { Authorization: 'Bearer admin-token' },
+      });
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/tables', {
+        headers: { Authorization: 'Bearer admin-token' },
+      });
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/time-slots', {
+        headers: { Authorization: 'Bearer admin-token' },
+      });
+      expect(container.textContent).toContain('Admin Dashboard');
+      expect(container.textContent).toContain('Total Reservations');
+      expect(container.textContent).toContain('Live Customer');
+      expect(container.textContent).toContain('Pending Customer');
+      expect(container.textContent).toContain('01 June 2026, 19:00 - 20:00');
+      expect(container.textContent).not.toContain('R2345678');
+    });
+
     expect(container.querySelector('a[href="/admin/reservations"]')).toBeTruthy();
     expect(container.querySelector('a[href="/tasks"]')).toBeTruthy();
     expect(container.querySelector('a[href="/admin/time-slots"]')).toBeTruthy();
@@ -331,7 +383,7 @@ describe('admin table management', () => {
     );
   };
 
-  test('admin can add, update, delete, and toggle table availability', async () => {
+  test('admin can add, update, and delete tables without a status column in the list', async () => {
     setAdminSession();
     axiosInstance.get.mockResolvedValue({
       data: [
@@ -362,15 +414,6 @@ describe('admin table management', () => {
         isAvailable: false,
       },
     });
-    axiosInstance.patch.mockResolvedValue({
-      data: {
-        _id: 'table-1',
-        tableNumber: 1,
-        capacity: 6,
-        location: 'Window',
-        isAvailable: true,
-      },
-    });
     axiosInstance.delete.mockResolvedValue({ data: { message: 'Table deleted successfully' } });
 
     await renderAppAt('/tasks');
@@ -380,6 +423,7 @@ describe('admin table management', () => {
         headers: { Authorization: 'Bearer admin-token' },
       });
       expect(container.textContent).toContain('Indoor');
+      expect(container.querySelector('.restaurant-admin-head').textContent).not.toContain('Status');
     });
 
     await act(async () => {
@@ -442,23 +486,6 @@ describe('admin table management', () => {
 
     await act(async () => {
       Array.from(container.querySelectorAll('button'))
-        .find((button) => button.textContent === 'Unavailable')
-        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    await waitFor(() => {
-      expect(axiosInstance.patch).toHaveBeenCalledWith(
-        '/api/tables/table-1/toggle-availability',
-        {},
-        {
-          headers: { Authorization: 'Bearer admin-token' },
-        }
-      );
-      expect(container.textContent).toContain('Available');
-    });
-
-    await act(async () => {
-      Array.from(container.querySelectorAll('button'))
         .find((button) => button.getAttribute('aria-label') === 'Delete table 2')
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
@@ -502,7 +529,7 @@ describe('admin time slot management', () => {
     );
   };
 
-  test('admin can add, update, and delete time slots', async () => {
+  test('admin can add, update, and delete time slots without a status column in the list', async () => {
     setAdminSession();
     axiosInstance.get.mockResolvedValue({
       data: [
@@ -539,6 +566,7 @@ describe('admin time slot management', () => {
         headers: { Authorization: 'Bearer admin-token' },
       });
       expect(container.textContent).toContain('17:00');
+      expect(container.querySelector('.restaurant-admin-head').textContent).not.toContain('Status');
     });
 
     await act(async () => {
@@ -612,6 +640,664 @@ describe('admin time slot management', () => {
   });
 });
 
+describe('admin reservation management', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+    }
+    if (container) {
+      document.body.removeChild(container);
+    }
+    root = null;
+    container = null;
+  });
+
+  test('admin can view, filter, and open reservation details', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'reservation-1',
+            customer: { name: 'Pelin Tatlidil', email: 'pelin@example.com' },
+            date: '2026-05-31T00:00:00.000Z',
+            timeSlot: { startTime: '18:00', endTime: '19:00' },
+            table: { tableNumber: 3, capacity: 4, location: 'Window' },
+            guests: 4,
+            status: 'Confirmed',
+            tablePreference: 'Window seat',
+            requests: 'Anniversary',
+          },
+          {
+            _id: 'reservation-2',
+            customer: { name: 'Noah Chen', email: 'noah@example.com' },
+            date: '2026-06-02T00:00:00.000Z',
+            timeSlot: { startTime: '19:00', endTime: '20:00' },
+            table: { tableNumber: 4, capacity: 2, location: 'Patio' },
+            guests: 2,
+            status: 'Pending',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] });
+
+    await renderAppAt('/admin/reservations');
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/reservations/admin', {
+        headers: { Authorization: 'Bearer admin-token' },
+      });
+      expect(container.textContent).toContain('Pelin Tatlidil');
+      expect(container.textContent).toContain('Noah Chen');
+      expect(container.textContent).toContain('18:00 - 19:00');
+    });
+
+    await act(async () => {
+      changeInputValue(container.querySelector('input[type="search"]'), 'Pelin');
+    });
+
+    expect(container.textContent).toContain('Pelin Tatlidil');
+    expect(container.textContent).not.toContain('Noah Chen');
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('.reservation-admin-row'))
+        .find((row) => row.textContent.includes('Pelin Tatlidil'))
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Reservation Details');
+    expect(container.textContent).toContain('Window seat');
+    expect(container.textContent).toContain('Anniversary');
+  });
+
+  test('admin can update reservation status from the edit form', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: '507f1f77bcf86cd799439013',
+            customerName: 'Status Customer',
+            customerEmail: 'status@example.com',
+            customerPhone: '0400111222',
+            date: '2026-05-31T00:00:00.000Z',
+            timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+            table: { _id: 'table-1', tableNumber: 1, capacity: 4, location: 'Indoor' },
+            guests: 2,
+            status: 'Confirmed',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] });
+    axiosInstance.put.mockResolvedValue({
+      data: {
+        _id: '507f1f77bcf86cd799439013',
+        customerName: 'Status Customer',
+        customerEmail: 'status@example.com',
+        customerPhone: '0400111222',
+        date: '2026-05-31T00:00:00.000Z',
+        timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+        table: { _id: 'table-1', tableNumber: 1, capacity: 4, location: 'Indoor' },
+        guests: 2,
+        status: 'No-show',
+      },
+    });
+
+    await renderAppAt('/admin/reservations');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Status Customer');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('.reservation-admin-row'))
+        .find((row) => row.textContent.includes('Status Customer'))
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Reservation Details');
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Edit')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      const selects = container.querySelectorAll('form select');
+      changeSelectValue(selects[2], 'No-show');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.put).toHaveBeenCalledWith(
+        '/api/reservations/admin/507f1f77bcf86cd799439013',
+        {
+          customerName: 'Status Customer',
+          customerEmail: 'status@example.com',
+          customerPhone: '0400111222',
+          date: '2026-05-31',
+          timeSlot: 'slot-1',
+          table: 'table-1',
+          guests: 2,
+          status: 'No-show',
+          tablePreference: '',
+          requests: '',
+        },
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Reservation updated successfully.');
+      expect(container.textContent).toContain('No-show');
+      expect(container.textContent).not.toContain('Reservation Details');
+    });
+  });
+
+  test('admin can create a reservation with an available table and time slot', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'table-1',
+            tableNumber: 1,
+            capacity: 4,
+            location: 'Indoor',
+            isAvailable: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'slot-1',
+            startTime: '18:00',
+            endTime: '19:00',
+            isAvailable: true,
+          },
+        ],
+      });
+    axiosInstance.post.mockResolvedValue({
+      data: {
+        _id: 'reservation-1',
+        customer: { name: 'Pelin Tatlidil', email: 'pelin@example.com' },
+        customerName: 'Pelin Tatlidil',
+        customerEmail: 'pelin@example.com',
+        customerPhone: '0400123456',
+        date: '2026-05-31T00:00:00.000Z',
+        timeSlot: { startTime: '18:00', endTime: '19:00' },
+        table: { tableNumber: 1, capacity: 4, location: 'Indoor' },
+        guests: 3,
+        status: 'Confirmed',
+        tablePreference: 'Indoor',
+        requests: 'Birthday',
+      },
+    });
+
+    await renderAppAt('/admin/reservations');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Add Reservation');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Add Reservation')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      const inputs = container.querySelectorAll('form input');
+      const selects = container.querySelectorAll('form select');
+      changeInputValue(inputs[0], 'Pelin Tatlidil');
+      changeInputValue(inputs[1], 'pelin@example.com');
+      changeInputValue(inputs[2], '0400123456');
+      changeInputValue(inputs[3], '2026-05-31');
+      changeInputValue(inputs[4], '3');
+      changeSelectValue(selects[0], 'slot-1');
+      changeSelectValue(selects[1], 'table-1');
+      changeSelectValue(selects[2], 'Confirmed');
+      changeInputValue(inputs[5], 'Indoor');
+      changeInputValue(container.querySelector('form textarea'), 'Birthday');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.post).toHaveBeenCalledWith(
+        '/api/reservations/admin',
+        {
+          customerName: 'Pelin Tatlidil',
+          customerEmail: 'pelin@example.com',
+          customerPhone: '0400123456',
+          date: '2026-05-31',
+          timeSlot: 'slot-1',
+          table: 'table-1',
+          guests: 3,
+          status: 'Confirmed',
+          tablePreference: 'Indoor',
+          requests: 'Birthday',
+        },
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Reservation created successfully.');
+      expect(container.textContent).toContain('Pelin Tatlidil');
+      expect(container.textContent).toContain('Table 1');
+    });
+  });
+
+  test('admin sees the reason when reservation creation fails', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'table-1',
+            tableNumber: 1,
+            capacity: 4,
+            location: 'Indoor',
+            isAvailable: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'slot-1',
+            startTime: '18:00',
+            endTime: '19:00',
+            isAvailable: true,
+          },
+        ],
+      });
+    axiosInstance.post.mockRejectedValue({
+      response: {
+        data: { message: 'Selected table is already booked for this time' },
+      },
+    });
+
+    await renderAppAt('/admin/reservations');
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Add Reservation')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      const inputs = container.querySelectorAll('form input');
+      const selects = container.querySelectorAll('form select');
+      changeInputValue(inputs[0], 'Walk In Customer');
+      changeInputValue(inputs[1], 'walkin@example.com');
+      changeInputValue(inputs[2], '0400111222');
+      changeInputValue(inputs[3], '2026-05-31');
+      changeInputValue(inputs[4], '2');
+      changeSelectValue(selects[0], 'slot-1');
+      changeSelectValue(selects[1], 'table-1');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(container.textContent).toContain(
+        'Reason: Selected table is already booked for this time'
+      );
+    });
+  });
+
+  test('admin table dropdown excludes pending or confirmed booked tables for selected date and time', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'reservation-1',
+            customerName: 'Booked Customer',
+            customerEmail: 'booked@example.com',
+            customerPhone: '0400111222',
+            date: '2026-05-31T00:00:00.000Z',
+            timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+            table: { _id: 'table-1', tableNumber: 1, capacity: 4, location: 'Indoor' },
+            guests: 2,
+            status: 'Pending',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'table-1',
+            tableNumber: 1,
+            capacity: 4,
+            location: 'Indoor',
+            isAvailable: true,
+          },
+          {
+            _id: 'table-2',
+            tableNumber: 2,
+            capacity: 4,
+            location: 'Patio',
+            isAvailable: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'slot-1',
+            startTime: '18:00',
+            endTime: '19:00',
+            isAvailable: true,
+          },
+        ],
+      });
+
+    await renderAppAt('/admin/reservations');
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Add Reservation')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      const inputs = container.querySelectorAll('form input');
+      const selects = container.querySelectorAll('form select');
+      changeInputValue(inputs[3], '2026-05-31');
+      changeSelectValue(selects[0], 'slot-1');
+    });
+
+    const tableOptions = Array.from(container.querySelectorAll('form select')[1].options).map(
+      (option) => option.textContent
+    );
+
+    expect(tableOptions).not.toContain('Table 1 - 4 guests - Indoor');
+    expect(tableOptions).toContain('Table 2 - 4 guests - Patio');
+  });
+
+  test('admin can update, soft delete, and recover an existing reservation', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+    axiosInstance.get
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: '507f1f77bcf86cd799439013',
+            customerName: 'Original Customer',
+            customerEmail: 'original@example.com',
+            customerPhone: '0400111222',
+            date: '2026-05-31T00:00:00.000Z',
+            timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+            table: { _id: 'table-1', tableNumber: 1, capacity: 4, location: 'Indoor' },
+            guests: 2,
+            status: 'Pending',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'table-1',
+            tableNumber: 1,
+            capacity: 4,
+            location: 'Indoor',
+            isAvailable: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            _id: 'slot-1',
+            startTime: '18:00',
+            endTime: '19:00',
+            isAvailable: true,
+          },
+        ],
+      });
+    axiosInstance.put.mockResolvedValue({
+      data: {
+        _id: '507f1f77bcf86cd799439013',
+        customerName: 'Updated Customer',
+        customerEmail: 'updated@example.com',
+        customerPhone: '0400999888',
+        date: '2026-05-31T00:00:00.000Z',
+        timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+        table: { _id: 'table-1', tableNumber: 1, capacity: 4, location: 'Indoor' },
+        guests: 3,
+        status: 'Confirmed',
+      },
+    });
+    axiosInstance.delete.mockResolvedValue({
+      data: {
+        message: 'Reservation deleted successfully',
+        reservation: {
+          _id: '507f1f77bcf86cd799439013',
+          customerName: 'Updated Customer',
+          customerEmail: 'updated@example.com',
+          customerPhone: '0400999888',
+          date: '2026-05-31T00:00:00.000Z',
+          timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+          table: { _id: 'table-1', tableNumber: 1, capacity: 4, location: 'Indoor' },
+          guests: 3,
+          status: 'Confirmed',
+          isDeleted: true,
+        },
+      },
+    });
+    axiosInstance.patch.mockResolvedValue({
+      data: {
+        message: 'Reservation recovered successfully',
+        reservation: {
+          _id: '507f1f77bcf86cd799439013',
+          customerName: 'Updated Customer',
+          customerEmail: 'updated@example.com',
+          customerPhone: '0400999888',
+          date: '2026-05-31T00:00:00.000Z',
+          timeSlot: { _id: 'slot-1', startTime: '18:00', endTime: '19:00' },
+          table: { _id: 'table-1', tableNumber: 1, capacity: 4, location: 'Indoor' },
+          guests: 3,
+          status: 'Confirmed',
+          isDeleted: false,
+        },
+      },
+    });
+
+    await renderAppAt('/admin/reservations');
+
+    await waitFor(() => {
+      expect(container.textContent).toContain('Original Customer');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Edit')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      const inputs = container.querySelectorAll('form input');
+      const selects = container.querySelectorAll('form select');
+      changeInputValue(inputs[0], 'Updated Customer');
+      changeInputValue(inputs[1], 'updated@example.com');
+      changeInputValue(inputs[2], '0400999888');
+      changeInputValue(inputs[4], '3');
+      changeSelectValue(selects[2], 'Confirmed');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.put).toHaveBeenCalledWith(
+        '/api/reservations/admin/507f1f77bcf86cd799439013',
+        {
+          customerName: 'Updated Customer',
+          customerEmail: 'updated@example.com',
+          customerPhone: '0400999888',
+          date: '2026-05-31',
+          timeSlot: 'slot-1',
+          table: 'table-1',
+          guests: 3,
+          status: 'Confirmed',
+          tablePreference: '',
+          requests: '',
+        },
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Reservation updated successfully.');
+      expect(container.textContent).toContain('Updated Customer');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Delete')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain('Delete Reservation');
+    expect(container.textContent).toContain('Delete reservation for Updated Customer?');
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .filter((button) => button.textContent === 'Delete')
+        .at(-1)
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.delete).toHaveBeenCalledWith(
+        '/api/reservations/admin/507f1f77bcf86cd799439013',
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Reservation deleted successfully.');
+      expect(container.textContent).toContain('Updated Customer');
+      expect(container.textContent).toContain('Deleted');
+      expect(container.textContent).toContain('Recover');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Recover')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.patch).toHaveBeenCalledWith(
+        '/api/reservations/admin/507f1f77bcf86cd799439013/recover',
+        {},
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Reservation recovered successfully.');
+      const reservationRows = Array.from(
+        container.querySelectorAll('.reservation-admin-row:not(.restaurant-admin-head)')
+      );
+      const updatedReservationRow = reservationRows.find((row) =>
+        row.textContent.includes('Updated Customer')
+      );
+      expect(updatedReservationRow.textContent).toContain('Confirmed');
+      expect(updatedReservationRow.textContent).not.toContain('Deleted');
+      expect(updatedReservationRow.textContent).not.toContain('Recover');
+    });
+  });
+
+  test('customer cannot access admin reservation management', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get.mockResolvedValue({
+      data: {
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+      },
+    });
+
+    await renderAppAt('/admin/reservations');
+
+    await waitFor(() => {
+      expect(container.textContent).not.toContain('Reservation Management');
+      expect(container.textContent).toContain('Manage your restaurant bookings');
+    });
+  });
+});
+
 describe('customer reservation time slots', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -666,6 +1352,65 @@ describe('customer reservation time slots', () => {
     });
 
     expect(container.querySelector('select').value).toBe('slot-1');
+  });
+});
+
+describe('customer reservation status view', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+    }
+    if (container) {
+      document.body.removeChild(container);
+    }
+    root = null;
+    container = null;
+  });
+
+  test('customer can see updated reservation status and notification', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get.mockResolvedValue({
+      data: [
+        {
+          _id: 'reservation-1',
+          date: '2026-05-31T00:00:00.000Z',
+          timeSlot: { startTime: '18:00', endTime: '19:00' },
+          table: { tableNumber: 1 },
+          guests: 2,
+          status: 'Completed',
+          customerNotification: {
+            message: 'Your reservation status has been updated to Completed.',
+          },
+        },
+      ],
+    });
+
+    await renderAppAt('/my-reservations');
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/reservations/my', {
+        headers: { Authorization: 'Bearer customer-token' },
+      });
+      expect(container.textContent).toContain('Completed');
+      expect(container.textContent).toContain(
+        'Your reservation status has been updated to Completed.'
+      );
+    });
   });
 });
 

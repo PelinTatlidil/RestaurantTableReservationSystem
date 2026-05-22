@@ -1,156 +1,125 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import axiosInstance from '../axiosConfig';
+import { useAuth } from '../context/AuthContext';
 
-const Register = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-  });
+const statusClassName = (status) => {
+  if (status === 'Confirmed' || status === 'Completed') {
+    return 'restaurant-status';
+  }
 
-  const [confirmPassword, setConfirmPassword] = useState('');
+  if (status === 'Pending') {
+    return 'restaurant-status restaurant-status-pending';
+  }
+
+  return 'restaurant-status restaurant-status-canceled';
+};
+
+const formatDate = (dateValue) =>
+  new Intl.DateTimeFormat('en-AU', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(dateValue));
+
+const reservationTime = (reservation) => {
+  if (reservation.timeSlot) {
+    return `${reservation.timeSlot.startTime} - ${reservation.timeSlot.endTime}`;
+  }
+
+  return 'Not assigned';
+};
+
+const MyReservations = () => {
+  const { user } = useAuth();
+  const [reservations, setReservations] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage({ type: '', text: '' });
+  useEffect(() => {
+    const loadReservations = async () => {
+      setLoading(true);
+      setMessage({ type: '', text: '' });
 
-    if (
-      !formData.name.trim() ||
-      !formData.email.trim() ||
-      !formData.phone.trim() ||
-      !formData.password
-    ) {
-      setMessage({
-        type: 'error',
-        text: 'Please complete all required fields.',
-      });
-      return;
-    }
+      try {
+        const response = await axiosInstance.get('/api/reservations/my', {
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+        setReservations(response.data);
+      } catch (error) {
+        setMessage({
+          type: 'error',
+          text: error.response?.data?.message || 'Failed to fetch reservations.',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    if (formData.password.length < 6) {
-      setMessage({
-        type: 'error',
-        text: 'Password must be at least 6 characters long.',
-      });
-      return;
-    }
-
-    if (formData.password !== confirmPassword) {
-      setMessage({
-        type: 'error',
-        text: 'Passwords do not match.',
-      });
-      return;
-    }
-
-    try {
-      const response = await axiosInstance.post('/api/auth/register', {
-        name: formData.name.trim(),
-        email: formData.email.trim().toLowerCase(),
-        phone: formData.phone.trim(),
-        password: formData.password,
-      });
-
-      setMessage({
-        type: 'success',
-        text: response.data.message || 'Registration successful. Please log in.',
-      });
-
-      setTimeout(() => navigate('/login'), 1200);
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error.response?.data?.message || 'Registration failed. Please try again.',
-      });
-    }
-  };
+    loadReservations();
+  }, [user]);
 
   return (
-    <main className="restaurant-auth-page">
-      <section className="w-full max-w-[477px]">
-        <h1 className="mb-8 font-serif text-5xl font-semibold text-stone-950">
-          Register Account
-        </h1>
+    <main className="restaurant-page px-6 py-10">
+      <section className="mx-auto max-w-6xl">
+        <div className="mb-8">
+          <h1 className="font-serif text-5xl font-semibold text-stone-950">My Reservations</h1>
+          <p className="mt-4 text-xl text-stone-700">
+            Track your booking details and reservation status.
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <input
-            type="text"
-            placeholder="Name"
-            required
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="restaurant-input"
-          />
-
-          <input
-            type="email"
-            placeholder="Email"
-            required
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="restaurant-input"
-          />
-
-          <input
-            type="password"
-            placeholder="Password"
-            required
-            value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            className="restaurant-input"
-          />
-
-          <input
-            type="password"
-            placeholder="Confirm Password"
-            required
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="restaurant-input"
-          />
-
-          <input
-            type="tel"
-            placeholder="Phone Number"
-            required
-            value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            className="restaurant-input"
-          />
-
-          {message.text && (
-            <p
-              className={
-                message.type === 'error'
-                  ? 'restaurant-message-error'
-                  : 'restaurant-message-success'
-              }
-            >
-              {message.text}
-            </p>
-          )}
-
-          <button type="submit" className="restaurant-button mt-4 w-[147px]">
-            Register
-          </button>
-        </form>
-
-        <div className="mt-6 flex flex-wrap items-center gap-4 text-xl text-stone-800">
-          <span>Already have an account?</span>
-          <Link
-            to="/login"
-            className="restaurant-button restaurant-button-secondary w-[130px]"
+        {message.text && (
+          <p
+            className={
+              message.type === 'error'
+                ? 'restaurant-message-error mb-6'
+                : 'restaurant-message-success mb-6'
+            }
           >
-            Login
-          </Link>
+            {message.text}
+          </p>
+        )}
+
+        <div className="restaurant-admin-table">
+          <div className="reservation-admin-row restaurant-admin-head">
+            <span>Date</span>
+            <span>Time</span>
+            <span>Guests</span>
+            <span>Table</span>
+            <span>Status</span>
+            <span>Notification</span>
+            <span></span>
+          </div>
+
+          {loading ? (
+            <div className="p-6 text-xl text-stone-700">Loading reservations...</div>
+          ) : reservations.length ? (
+            reservations.map((reservation) => (
+              <div key={reservation._id} className="reservation-admin-row">
+                <span>{formatDate(reservation.date)}</span>
+                <span>{reservationTime(reservation)}</span>
+                <span>{reservation.guests}</span>
+                <span>
+                  {reservation.table
+                    ? `Table ${reservation.table.tableNumber}`
+                    : 'Not assigned'}
+                </span>
+                <span>
+                  <span className={statusClassName(reservation.status)}>
+                    {reservation.status}
+                  </span>
+                </span>
+                <span>{reservation.customerNotification?.message || 'No updates'}</span>
+                <span></span>
+              </div>
+            ))
+          ) : (
+            <div className="p-6 text-xl text-stone-700">No reservations found.</div>
+          )}
         </div>
       </section>
     </main>
   );
 };
 
-export default Register;
+export default MyReservations;

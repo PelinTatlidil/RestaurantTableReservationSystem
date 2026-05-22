@@ -206,32 +206,19 @@ const ManageTimeSlots = () => {
         )}
 
         <div className="restaurant-admin-table">
-          <div className="restaurant-admin-row restaurant-admin-head">
+          <div className="time-slot-admin-row restaurant-admin-head">
             <span>Start Time</span>
             <span>End Time</span>
-            <span>Status</span>
-            <span>Action</span>
-            <span></span>
+            <span>Actions</span>
           </div>
 
           {loading ? (
             <div className="p-6 text-xl text-stone-700">Loading time slots...</div>
           ) : timeSlots.length ? (
             timeSlots.map((timeSlot) => (
-              <div key={timeSlot._id} className="restaurant-admin-row">
+              <div key={timeSlot._id} className="time-slot-admin-row">
                 <span>{timeSlot.startTime}</span>
                 <span>{timeSlot.endTime}</span>
-                <span>
-                  <span
-                    className={
-                      timeSlot.isAvailable
-                        ? 'restaurant-status'
-                        : 'restaurant-status restaurant-status-canceled'
-                    }
-                  >
-                    {timeSlot.isAvailable ? 'Available' : 'Unavailable'}
-                  </span>
-                </span>
                 <span className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -250,7 +237,6 @@ const ManageTimeSlots = () => {
                     Delete
                   </button>
                 </span>
-                <span></span>
               </div>
             ))
           ) : (

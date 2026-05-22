@@ -139,24 +139,6 @@ const Tasks = () => {
     }
   };
 
-  const handleToggleAvailability = async (tableId) => {
-    try {
-      const response = await axiosInstance.patch(
-        `/api/tables/${tableId}/toggle-availability`,
-        {},
-        authConfig
-      );
-      setTables((currentTables) =>
-        currentTables.map((table) => (table._id === response.data._id ? response.data : table))
-      );
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: error.response?.data?.message || 'Failed to update availability.',
-      });
-    }
-  };
-
   return (
     <main className="restaurant-page px-6 py-10">
       <section className="mx-auto max-w-7xl">
@@ -243,35 +225,21 @@ const Tasks = () => {
         )}
 
         <div className="restaurant-admin-table">
-          <div className="restaurant-admin-row restaurant-admin-head">
+          <div className="table-admin-row restaurant-admin-head">
             <span>Table Number</span>
             <span>Capacity</span>
             <span>Location</span>
-            <span>Status</span>
-            <span>Action</span>
+            <span>Actions</span>
           </div>
 
           {loading ? (
             <div className="p-6 text-xl text-stone-700">Loading tables...</div>
           ) : tables.length ? (
             tables.map((table) => (
-              <div key={table._id} className="restaurant-admin-row">
+              <div key={table._id} className="table-admin-row">
                 <span>{table.tableNumber}</span>
                 <span>{table.capacity}</span>
                 <span>{table.location}</span>
-                <span>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleAvailability(table._id)}
-                    className={
-                      table.isAvailable
-                        ? 'restaurant-status'
-                        : 'restaurant-status restaurant-status-canceled'
-                    }
-                  >
-                    {table.isAvailable ? 'Available' : 'Unavailable'}
-                  </button>
-                </span>
                 <span className="flex flex-wrap gap-2">
                   <button
                     type="button"
