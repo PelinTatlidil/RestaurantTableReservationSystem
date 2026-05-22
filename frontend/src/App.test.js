@@ -230,6 +230,188 @@ describe('restaurant information page', () => {
   });
 });
 
+describe('admin restaurant information management', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+    }
+    if (container) {
+      document.body.removeChild(container);
+    }
+    root = null;
+    container = null;
+  });
+
+  const setAdminSession = () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+  };
+
+  test('admin can view and update restaurant information', async () => {
+    setAdminSession();
+    axiosInstance.get.mockResolvedValue({
+      data: {
+        name: 'Digi Meat Restaurant',
+        address: {
+          street: '123 Food Street',
+          city: 'Brisbane',
+          state: 'QLD',
+          postcode: '4000',
+        },
+        contact: {
+          phone: '0400 123 456',
+          email: 'info@restaurant.com',
+        },
+        openingHours: ['Mon to Fri 11:00 AM to 10:00 PM'],
+        bookingPolicy: 'Bookings are recommended.',
+      },
+    });
+    axiosInstance.put.mockResolvedValue({
+      data: {
+        name: 'Updated Restaurant',
+        address: {
+          street: '456 New Street',
+          city: 'Brisbane',
+          state: 'QLD',
+          postcode: '4001',
+        },
+        contact: {
+          phone: '0400 999 888',
+          email: 'bookings@example.com',
+        },
+        openingHours: ['Mon to Fri 10:00 AM to 9:00 PM', 'Sat 11:00 AM to 10:00 PM'],
+        bookingPolicy: 'Bookings can be changed up to two hours before arrival.',
+      },
+    });
+
+    await renderAppAt('/admin/restaurant-info');
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/restaurant-info');
+      expect(container.textContent).toContain('Restaurant Information Management');
+      expect(container.querySelector('input').value).toBe('Digi Meat Restaurant');
+    });
+
+    await act(async () => {
+      const inputs = container.querySelectorAll('form input');
+      const textareas = container.querySelectorAll('form textarea');
+      changeInputValue(inputs[0], 'Updated Restaurant');
+      changeInputValue(inputs[1], '456 New Street');
+      changeInputValue(inputs[2], 'Brisbane');
+      changeInputValue(inputs[3], 'QLD');
+      changeInputValue(inputs[4], '4001');
+      changeInputValue(inputs[5], '0400 999 888');
+      changeInputValue(inputs[6], 'bookings@example.com');
+      changeInputValue(textareas[0], 'Mon to Fri 10:00 AM to 9:00 PM\nSat 11:00 AM to 10:00 PM');
+      changeInputValue(textareas[1], 'Bookings can be changed up to two hours before arrival.');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.put).toHaveBeenCalledWith(
+        '/api/restaurant-info',
+        {
+          name: 'Updated Restaurant',
+          address: {
+            street: '456 New Street',
+            city: 'Brisbane',
+            state: 'QLD',
+            postcode: '4001',
+          },
+          contact: {
+            phone: '0400 999 888',
+            email: 'bookings@example.com',
+          },
+          openingHours: ['Mon to Fri 10:00 AM to 9:00 PM', 'Sat 11:00 AM to 10:00 PM'],
+          bookingPolicy: 'Bookings can be changed up to two hours before arrival.',
+        },
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Restaurant information updated successfully.');
+      expect(container.querySelector('input').value).toBe('Updated Restaurant');
+    });
+  });
+
+  test('admin sees validation errors before saving incomplete restaurant information', async () => {
+    setAdminSession();
+    axiosInstance.get.mockResolvedValue({
+      data: {
+        name: 'Digi Meat Restaurant',
+        address: {
+          street: '123 Food Street',
+          city: 'Brisbane',
+          state: 'QLD',
+          postcode: '4000',
+        },
+        contact: {
+          phone: '0400 123 456',
+          email: 'info@restaurant.com',
+        },
+        openingHours: ['Mon to Fri 11:00 AM to 10:00 PM'],
+        bookingPolicy: 'Bookings are recommended.',
+      },
+    });
+
+    await renderAppAt('/admin/restaurant-info');
+
+    await waitFor(() => {
+      expect(container.querySelector('input').value).toBe('Digi Meat Restaurant');
+    });
+
+    await act(async () => {
+      changeInputValue(container.querySelector('input'), '');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(axiosInstance.put).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('Restaurant name is required.');
+  });
+
+  test('customer cannot access restaurant information management', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get.mockResolvedValue({
+      data: {
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+      },
+    });
+
+    await renderAppAt('/admin/restaurant-info');
+
+    await waitFor(() => {
+      expect(container.textContent).not.toContain('Restaurant Information Management');
+      expect(container.textContent).toContain('Manage your restaurant bookings');
+    });
+  });
+});
+
 describe('admin dashboard access and navigation', () => {
   beforeEach(() => {
     localStorage.clear();
