@@ -11,10 +11,10 @@ import MyReservations from './pages/MyReservations';
 import MakeReservation from './pages/MakeReservation';
 import ReservationConfirmation from './pages/ReservationConfirmation';
 import CustomerPanel from './pages/CustomerPanel';
-import AdminManagementPage from './pages/AdminManagementPage';
 import ManageTimeSlots from './pages/ManageTimeSlots';
 import AdminReservations from './pages/AdminReservations';
 import AdminUsers from './pages/AdminUsers';
+import AdminRestaurantInfo from './pages/AdminRestaurantInfo';
 
 const RequireRole = ({ children, role }) => {
   const { user } = useAuth();
@@ -98,10 +98,7 @@ function App() {
           path="/admin/restaurant-info"
           element={
             <RequireRole role="admin">
-              <AdminManagementPage
-                title="Restaurant Information Management"
-                description="Maintain restaurant contact details, opening hours, and booking policy."
-              />
+              <AdminRestaurantInfo />
             </RequireRole>
           }
         />
