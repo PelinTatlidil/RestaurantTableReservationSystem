@@ -6,11 +6,15 @@ const Table = require('../models/Table');
 const TimeSlot = require('../models/TimeSlot');
 const User = require('../models/User');
 const {
+  checkCustomerReservationAvailability,
+  cancelCustomerReservation,
   createAdminReservation,
+  createCustomerReservation,
   deleteAdminReservation,
   getAdminReservations,
   getCustomerReservations,
   updateAdminReservation,
+  updateCustomerReservation,
   updateReservationStatus,
   recoverAdminReservation,
 } = require('../controllers/reservationController');
@@ -418,7 +422,7 @@ describe('Admin reservation management', () => {
     });
   });
 
-  it('retrieves customer reservations by user id or email', async () => {
+  it('retrieves only reservations linked to the logged-in customer id', async () => {
     const reservations = [{ _id: 'reservation-id', status: 'Completed' }];
     const sort = sinon.stub().resolves(reservations);
     const secondPopulate = sinon.stub().returns({ sort });
@@ -435,9 +439,484 @@ describe('Admin reservation management', () => {
     await getCustomerReservations(req, res);
 
     expect(Reservation.find.calledWith({
-      $or: [{ customer: req.user._id }, { customerEmail: req.user.email }],
+      customer: req.user._id,
+      isDeleted: { $ne: true },
     })).to.equal(true);
     expect(res.statusCode).to.equal(200);
     expect(res.body).to.deep.equal(reservations);
+  });
+});
+
+describe('Customer reservation creation', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('creates a confirmed customer reservation with the exact size available table', async () => {
+    const timeSlot = {
+      _id: '507f1f77bcf86cd799439011',
+      startTime: '18:00',
+      endTime: '19:00',
+      isAvailable: true,
+    };
+    const exactTable = {
+      _id: '507f1f77bcf86cd799439012',
+      tableNumber: 4,
+      capacity: 4,
+      location: 'Indoor',
+      isAvailable: true,
+    };
+    const largerTable = {
+      _id: '507f1f77bcf86cd799439013',
+      tableNumber: 5,
+      capacity: 6,
+      location: 'Window',
+      isAvailable: true,
+    };
+    const createdReservation = { _id: '507f1f77bcf86cd799439014' };
+    const populatedReservation = {
+      _id: createdReservation._id,
+      timeSlot,
+      table: exactTable,
+      guests: 4,
+      status: 'Confirmed',
+    };
+    const finalPopulate = sinon.stub().resolves(populatedReservation);
+    const secondPopulate = sinon.stub().returns({ populate: finalPopulate });
+    const firstPopulate = sinon.stub().returns({ populate: secondPopulate });
+
+    sinon.stub(TimeSlot, 'findById').resolves(timeSlot);
+    sinon.stub(Table, 'find').returns({
+      sort: sinon.stub().resolves([exactTable, largerTable]),
+    });
+    sinon.stub(Reservation, 'find').returns({
+      select: sinon.stub().resolves([]),
+    });
+    sinon.stub(Reservation, 'create').resolves(createdReservation);
+    sinon.stub(Reservation, 'findById').returns({ populate: firstPopulate });
+
+    const req = {
+      user: {
+        _id: '507f1f77bcf86cd799439015',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+      },
+      body: {
+        date: '2026-05-31',
+        timeSlotId: timeSlot._id,
+        guests: 4,
+        tablePreference: 'Window',
+        requests: 'Birthday',
+      },
+    };
+    const res = createResponse();
+
+    await createCustomerReservation(req, res);
+
+    expect(Table.find.firstCall.args[0]).to.deep.equal({
+      isAvailable: true,
+      capacity: { $gte: 4 },
+    });
+    expect(Reservation.create.firstCall.args[0]).to.include({
+      customerName: 'Customer A',
+      customerEmail: 'customer@example.com',
+      customerPhone: '0400123456',
+      table: exactTable._id,
+      guests: 4,
+      status: 'Confirmed',
+      tablePreference: 'Window',
+      requests: 'Birthday',
+    });
+    expect(res.statusCode).to.equal(201);
+    expect(res.body.message).to.equal('Reservation confirmed successfully');
+    expect(res.body.reservation).to.deep.equal(populatedReservation);
+  });
+
+  it('assigns the next larger table when the exact size table is already booked', async () => {
+    const exactTable = {
+      _id: '507f1f77bcf86cd799439012',
+      tableNumber: 4,
+      capacity: 4,
+      isAvailable: true,
+    };
+    const largerTable = {
+      _id: '507f1f77bcf86cd799439013',
+      tableNumber: 5,
+      capacity: 6,
+      isAvailable: true,
+    };
+    const createdReservation = { _id: '507f1f77bcf86cd799439014' };
+    const populatedReservation = {
+      _id: createdReservation._id,
+      table: largerTable,
+      guests: 4,
+      status: 'Confirmed',
+    };
+    const finalPopulate = sinon.stub().resolves(populatedReservation);
+    const secondPopulate = sinon.stub().returns({ populate: finalPopulate });
+    const firstPopulate = sinon.stub().returns({ populate: secondPopulate });
+
+    sinon.stub(TimeSlot, 'findById').resolves({
+      _id: '507f1f77bcf86cd799439011',
+      isAvailable: true,
+    });
+    sinon.stub(Table, 'find').returns({
+      sort: sinon.stub().resolves([exactTable, largerTable]),
+    });
+    sinon.stub(Reservation, 'find').returns({
+      select: sinon.stub().resolves([{ _id: 'existing-reservation', table: exactTable._id }]),
+    });
+    sinon.stub(Reservation, 'create').resolves(createdReservation);
+    sinon.stub(Reservation, 'findById').returns({ populate: firstPopulate });
+
+    const req = {
+      user: {
+        _id: '507f1f77bcf86cd799439015',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+      },
+      body: {
+        date: '2026-05-31',
+        timeSlot: '507f1f77bcf86cd799439011',
+        guests: 4,
+      },
+    };
+    const res = createResponse();
+
+    await createCustomerReservation(req, res);
+
+    expect(Reservation.create.firstCall.args[0].table).to.equal(largerTable._id);
+    expect(res.statusCode).to.equal(201);
+    expect(res.body.reservation.table).to.deep.equal(largerTable);
+  });
+
+  it('rejects customer reservations when no suitable table is available', async () => {
+    sinon.stub(TimeSlot, 'findById').resolves({
+      _id: '507f1f77bcf86cd799439011',
+      isAvailable: true,
+    });
+    sinon.stub(Table, 'find').returns({
+      sort: sinon.stub().resolves([]),
+    });
+
+    const req = {
+      user: {
+        _id: '507f1f77bcf86cd799439015',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+      },
+      body: {
+        date: '2026-05-31',
+        timeSlot: '507f1f77bcf86cd799439011',
+        guests: 8,
+      },
+    };
+    const res = createResponse();
+
+    await createCustomerReservation(req, res);
+
+    expect(res.statusCode).to.equal(400);
+    expect(res.body.message).to.equal('No tables are available for this date, time, and guest count');
+  });
+
+  it('rejects customer reservations for unavailable time slots', async () => {
+    sinon.stub(TimeSlot, 'findById').resolves({
+      _id: '507f1f77bcf86cd799439011',
+      isAvailable: false,
+    });
+
+    const req = {
+      user: {
+        _id: '507f1f77bcf86cd799439015',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+      },
+      body: {
+        date: '2026-05-31',
+        timeSlot: '507f1f77bcf86cd799439011',
+        guests: 2,
+      },
+    };
+    const res = createResponse();
+
+    await createCustomerReservation(req, res);
+
+    expect(res.statusCode).to.equal(400);
+    expect(res.body.message).to.equal('Selected time slot is not available');
+  });
+
+  it('returns available table details for a valid availability check', async () => {
+    const table = {
+      _id: '507f1f77bcf86cd799439012',
+      tableNumber: 2,
+      capacity: 4,
+      location: 'Window',
+      isAvailable: true,
+    };
+    sinon.stub(TimeSlot, 'findById').resolves({
+      _id: '507f1f77bcf86cd799439011',
+      isAvailable: true,
+    });
+    sinon.stub(Table, 'find').returns({
+      sort: sinon.stub().resolves([table]),
+    });
+    sinon.stub(Reservation, 'find').returns({
+      select: sinon.stub().resolves([]),
+    });
+
+    const req = {
+      query: {
+        date: '2026-05-31',
+        timeSlotId: '507f1f77bcf86cd799439011',
+        guests: '4',
+      },
+    };
+    const res = createResponse();
+
+    await checkCustomerReservationAvailability(req, res);
+
+    expect(res.statusCode).to.equal(200);
+    expect(res.body).to.deep.equal({
+      available: true,
+      message: 'A table is available for this reservation',
+      table: {
+        _id: table._id,
+        tableNumber: 2,
+        capacity: 4,
+        location: 'Window',
+      },
+    });
+  });
+
+  it('returns unavailable when all suitable tables are already booked and ignores cancelled reservations', async () => {
+    const activeBookedTable = {
+      _id: '507f1f77bcf86cd799439012',
+      tableNumber: 2,
+      capacity: 4,
+      isAvailable: true,
+    };
+    sinon.stub(TimeSlot, 'findById').resolves({
+      _id: '507f1f77bcf86cd799439011',
+      isAvailable: true,
+    });
+    sinon.stub(Table, 'find').returns({
+      sort: sinon.stub().resolves([activeBookedTable]),
+    });
+    const reservationFind = sinon.stub(Reservation, 'find').returns({
+      select: sinon.stub().resolves([
+        {
+          _id: 'active-reservation',
+          table: activeBookedTable._id,
+          status: 'Confirmed',
+        },
+      ]),
+    });
+
+    const req = {
+      query: {
+        date: '2026-05-31',
+        timeSlot: '507f1f77bcf86cd799439011',
+        guests: '4',
+      },
+    };
+    const res = createResponse();
+
+    await checkCustomerReservationAvailability(req, res);
+
+    expect(res.statusCode).to.equal(200);
+    expect(res.body.available).to.equal(false);
+    expect(res.body.message).to.equal('No tables are available for this date, time, and guest count');
+    expect(reservationFind.firstCall.args[0].status).to.deep.equal({ $in: ['Pending', 'Confirmed'] });
+  });
+
+  it('updates a reservation owned by the logged-in customer and assigns a suitable table', async () => {
+    const reservationId = '507f1f77bcf86cd799439013';
+    const customerId = '507f1f77bcf86cd799439015';
+    const table = {
+      _id: '507f1f77bcf86cd799439012',
+      tableNumber: 2,
+      capacity: 4,
+      isAvailable: true,
+    };
+    const reservation = {
+      _id: reservationId,
+      customer: customerId,
+      save: sinon.stub().resolves({ _id: reservationId }),
+    };
+    const populatedReservation = {
+      _id: reservationId,
+      table,
+      guests: 4,
+      status: 'Confirmed',
+    };
+    const finalPopulate = sinon.stub().resolves(populatedReservation);
+    const secondPopulate = sinon.stub().returns({ populate: finalPopulate });
+    const firstPopulate = sinon.stub().returns({ populate: secondPopulate });
+    const findById = sinon.stub(Reservation, 'findById');
+    findById.onFirstCall().resolves(reservation);
+    findById.onSecondCall().returns({ populate: firstPopulate });
+    sinon.stub(TimeSlot, 'findById').resolves({
+      _id: '507f1f77bcf86cd799439011',
+      isAvailable: true,
+    });
+    sinon.stub(Table, 'find').returns({
+      sort: sinon.stub().resolves([table]),
+    });
+    sinon.stub(Reservation, 'find').returns({
+      select: sinon.stub().resolves([]),
+    });
+
+    const req = {
+      params: { id: reservationId },
+      user: {
+        _id: customerId,
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+      },
+      body: {
+        date: '2026-06-01',
+        timeSlotId: '507f1f77bcf86cd799439011',
+        guests: 4,
+        tablePreference: 'Window',
+        requests: 'Birthday',
+      },
+    };
+    const res = createResponse();
+
+    await updateCustomerReservation(req, res);
+
+    expect(Reservation.find.firstCall.args[0]._id).to.deep.equal({ $ne: reservationId });
+    expect(reservation.table).to.equal(table._id);
+    expect(reservation.guests).to.equal(4);
+    expect(reservation.status).to.equal('Confirmed');
+    expect(reservation.tablePreference).to.equal('Window');
+    expect(reservation.requests).to.equal('Birthday');
+    expect(reservation.save.calledOnce).to.equal(true);
+    expect(res.statusCode).to.equal(200);
+    expect(res.body.message).to.equal('Reservation updated successfully');
+    expect(res.body.reservation).to.deep.equal(populatedReservation);
+  });
+
+  it('rejects customer reservation updates when no suitable table is available', async () => {
+    const reservation = {
+      _id: '507f1f77bcf86cd799439013',
+      customer: '507f1f77bcf86cd799439015',
+      save: sinon.stub(),
+    };
+    sinon.stub(Reservation, 'findById').resolves(reservation);
+    sinon.stub(TimeSlot, 'findById').resolves({
+      _id: '507f1f77bcf86cd799439011',
+      isAvailable: true,
+    });
+    sinon.stub(Table, 'find').returns({
+      sort: sinon.stub().resolves([]),
+    });
+
+    const req = {
+      params: { id: reservation._id },
+      user: { _id: '507f1f77bcf86cd799439015' },
+      body: {
+        date: '2026-06-01',
+        timeSlotId: '507f1f77bcf86cd799439011',
+        guests: 8,
+      },
+    };
+    const res = createResponse();
+
+    await updateCustomerReservation(req, res);
+
+    expect(res.statusCode).to.equal(400);
+    expect(res.body.message).to.equal('No tables are available for this date, time, and guest count');
+    expect(reservation.save.called).to.equal(false);
+  });
+
+  it('prevents customers from updating another user reservation', async () => {
+    sinon.stub(Reservation, 'findById').resolves({
+      _id: '507f1f77bcf86cd799439013',
+      customer: '507f1f77bcf86cd799439016',
+    });
+
+    const req = {
+      params: { id: '507f1f77bcf86cd799439013' },
+      user: { _id: '507f1f77bcf86cd799439015' },
+      body: {
+        date: '2026-06-01',
+        timeSlotId: '507f1f77bcf86cd799439011',
+        guests: 2,
+      },
+    };
+    const res = createResponse();
+
+    await updateCustomerReservation(req, res);
+
+    expect(res.statusCode).to.equal(403);
+    expect(res.body.message).to.equal('You can only update your own reservations');
+  });
+
+  it('cancels a reservation owned by the logged-in customer', async () => {
+    const reservationId = '507f1f77bcf86cd799439013';
+    const customerId = '507f1f77bcf86cd799439015';
+    const reservation = {
+      _id: reservationId,
+      customer: customerId,
+      status: 'Confirmed',
+      save: sinon.stub().resolves({ _id: reservationId }),
+    };
+    const populatedReservation = {
+      _id: reservationId,
+      customer: customerId,
+      status: 'Cancelled',
+      customerNotification: {
+        message: 'Your reservation has been cancelled.',
+      },
+    };
+    const finalPopulate = sinon.stub().resolves(populatedReservation);
+    const secondPopulate = sinon.stub().returns({ populate: finalPopulate });
+    const firstPopulate = sinon.stub().returns({ populate: secondPopulate });
+    const findById = sinon.stub(Reservation, 'findById');
+    findById.onFirstCall().resolves(reservation);
+    findById.onSecondCall().returns({ populate: firstPopulate });
+
+    const req = {
+      params: { id: reservationId },
+      user: { _id: customerId },
+    };
+    const res = createResponse();
+
+    await cancelCustomerReservation(req, res);
+
+    expect(reservation.status).to.equal('Cancelled');
+    expect(reservation.customerNotification.message).to.equal('Your reservation has been cancelled.');
+    expect(reservation.save.calledOnce).to.equal(true);
+    expect(res.statusCode).to.equal(200);
+    expect(res.body.message).to.equal('Reservation cancelled successfully');
+    expect(res.body.reservation).to.deep.equal(populatedReservation);
+  });
+
+  it('prevents customers from cancelling another user reservation', async () => {
+    const reservation = {
+      _id: '507f1f77bcf86cd799439013',
+      customer: '507f1f77bcf86cd799439016',
+      save: sinon.stub(),
+    };
+    sinon.stub(Reservation, 'findById').resolves(reservation);
+
+    const req = {
+      params: { id: reservation._id },
+      user: { _id: '507f1f77bcf86cd799439015' },
+    };
+    const res = createResponse();
+
+    await cancelCustomerReservation(req, res);
+
+    expect(res.statusCode).to.equal(403);
+    expect(res.body.message).to.equal('You can only cancel your own reservations');
+    expect(reservation.save.called).to.equal(false);
   });
 });

@@ -28,14 +28,6 @@ const RequireRole = ({ children, role }) => {
   return children;
 };
 
-const RequireAuth = ({ children }) => {
-  const { user } = useAuth();
-
-  if (!user) return <Navigate to="/login" replace />;
-
-  return children;
-};
-
 function App() {
   return (
     <Router>
@@ -106,25 +98,25 @@ function App() {
         <Route
           path="/my-reservations"
           element={
-            <RequireAuth>
+            <RequireRole role="customer">
               <MyReservations />
-            </RequireAuth>
+            </RequireRole>
           }
         />
         <Route
           path="/make-reservation"
           element={
-            <RequireAuth>
+            <RequireRole role="customer">
               <MakeReservation />
-            </RequireAuth>
+            </RequireRole>
           }
         />
         <Route
           path="/reservation-confirmation"
           element={
-            <RequireAuth>
+            <RequireRole role="customer">
               <ReservationConfirmation />
-            </RequireAuth>
+            </RequireRole>
           }
         />
         <Route
