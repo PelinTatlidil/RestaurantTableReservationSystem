@@ -5,7 +5,9 @@ import { AuthProvider } from './context/AuthContext';
 import axiosInstance from './axiosConfig';
 
 jest.mock('./axiosConfig', () => ({
+  delete: jest.fn(),
   get: jest.fn(),
+  patch: jest.fn(),
   post: jest.fn(),
   put: jest.fn(),
 }));
@@ -62,6 +64,22 @@ const changeInputValue = (input, value) => {
   }
 
   input.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
+const changeCheckboxValue = (input, checked) => {
+  const checkedSetter = Object.getOwnPropertyDescriptor(input, 'checked')?.set;
+  const prototype = Object.getPrototypeOf(input);
+  const prototypeCheckedSetter = Object.getOwnPropertyDescriptor(prototype, 'checked')?.set;
+
+  if (prototypeCheckedSetter && checkedSetter !== prototypeCheckedSetter) {
+    prototypeCheckedSetter.call(input, checked);
+  } else if (checkedSetter) {
+    checkedSetter.call(input, checked);
+  } else {
+    input.checked = checked;
+  }
+
+  input.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
 describe('logout and protected access', () => {
@@ -263,6 +281,177 @@ describe('admin dashboard access and navigation', () => {
     await waitFor(() => {
       expect(container.textContent).not.toContain('Admin Dashboard');
       expect(container.textContent).toContain('Manage your restaurant bookings');
+    });
+  });
+});
+
+describe('admin table management', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+    }
+    if (container) {
+      document.body.removeChild(container);
+    }
+    root = null;
+    container = null;
+  });
+
+  const setAdminSession = () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+  };
+
+  test('admin can add, update, delete, and toggle table availability', async () => {
+    setAdminSession();
+    axiosInstance.get.mockResolvedValue({
+      data: [
+        {
+          _id: 'table-1',
+          tableNumber: 1,
+          capacity: 2,
+          location: 'Indoor',
+          isAvailable: true,
+        },
+      ],
+    });
+    axiosInstance.post.mockResolvedValue({
+      data: {
+        _id: 'table-2',
+        tableNumber: 2,
+        capacity: 4,
+        location: 'Patio',
+        isAvailable: true,
+      },
+    });
+    axiosInstance.put.mockResolvedValue({
+      data: {
+        _id: 'table-1',
+        tableNumber: 1,
+        capacity: 6,
+        location: 'Window',
+        isAvailable: false,
+      },
+    });
+    axiosInstance.patch.mockResolvedValue({
+      data: {
+        _id: 'table-1',
+        tableNumber: 1,
+        capacity: 6,
+        location: 'Window',
+        isAvailable: true,
+      },
+    });
+    axiosInstance.delete.mockResolvedValue({ data: { message: 'Table deleted successfully' } });
+
+    await renderAppAt('/tasks');
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/tables', {
+        headers: { Authorization: 'Bearer admin-token' },
+      });
+      expect(container.textContent).toContain('Indoor');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Add Table')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      changeInputValue(container.querySelector('input[placeholder="Table Number"]'), '2');
+      changeInputValue(container.querySelector('input[placeholder="Capacity"]'), '4');
+      changeInputValue(container.querySelector('input[placeholder="Location"]'), 'Patio');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.post).toHaveBeenCalledWith(
+        '/api/tables',
+        {
+          tableNumber: 2,
+          capacity: 4,
+          location: 'Patio',
+          isAvailable: true,
+        },
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Table added successfully.');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.getAttribute('aria-label') === 'Edit table 1')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      changeInputValue(container.querySelector('input[placeholder="Capacity"]'), '6');
+      changeInputValue(container.querySelector('input[placeholder="Location"]'), 'Window');
+      changeCheckboxValue(container.querySelector('input[type="checkbox"]'), false);
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.put).toHaveBeenCalledWith(
+        '/api/tables/table-1',
+        {
+          tableNumber: 1,
+          capacity: 6,
+          location: 'Window',
+          isAvailable: true,
+        },
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Table updated successfully.');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Unavailable')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.patch).toHaveBeenCalledWith(
+        '/api/tables/table-1/toggle-availability',
+        {},
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Available');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.getAttribute('aria-label') === 'Delete table 2')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.delete).toHaveBeenCalledWith('/api/tables/table-2', {
+        headers: { Authorization: 'Bearer admin-token' },
+      });
+      expect(container.textContent).toContain('Table deleted successfully.');
     });
   });
 });
