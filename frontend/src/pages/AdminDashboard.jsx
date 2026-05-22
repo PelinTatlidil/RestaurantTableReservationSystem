@@ -1,83 +1,15 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-const stats = [
-  {
-    label: 'Total Reservations',
-    value: '128',
-    period: 'All time',
-    accent: 'bg-[#dff7d4] text-[#016630]',
-    icon: 'Cal',
-  },
-  {
-    label: 'Confirmed Reservations',
-    value: '96',
-    period: 'All time',
-    accent: 'bg-[#dfeedd] text-[#386b34]',
-    icon: 'Ok',
-  },
-  {
-    label: 'Canceled Reservations',
-    value: '32',
-    period: 'All time',
-    accent: 'bg-[#f0dfdc] text-[#9b3d32]',
-    icon: 'No',
-  },
-  {
-    label: 'Available Tables',
-    value: '14',
-    period: 'All time',
-    accent: 'bg-[#e4dfef] text-[#5a4d7c]',
-    icon: 'Tbl',
-  },
-  {
-    label: 'Open Time Slots',
-    value: '42',
-    period: 'This week',
-    accent: 'bg-[#e5f4f7] text-[#12616d]',
-    icon: 'Slot',
-  },
-];
-
-const reservations = [
-  {
-    id: 'R2345678',
-    customer: 'Pelin Tatlidil',
-    dateTime: '31 May 2026, 7:00 PM',
-    guests: '4',
-    table: 'Window seat',
-    status: 'Confirmed',
-  },
-  {
-    id: 'R2345679',
-    customer: 'Aria Morgan',
-    dateTime: '01 Jun 2026, 6:30 PM',
-    guests: '2',
-    table: 'Indoor',
-    status: 'Confirmed',
-  },
-  {
-    id: 'R2345680',
-    customer: 'Noah Chen',
-    dateTime: '02 Jun 2026, 8:15 PM',
-    guests: '6',
-    table: 'Indoor',
-    status: 'Canceled',
-  },
-  {
-    id: 'R2345681',
-    customer: 'Maya Singh',
-    dateTime: '04 Jun 2026, 7:45 PM',
-    guests: '3',
-    table: 'Patio',
-    status: 'Pending',
-  },
-];
+import axiosInstance from '../axiosConfig';
 
 const statusClass = {
   Confirmed: 'restaurant-status',
+  Completed: 'restaurant-status',
   Pending: 'restaurant-status restaurant-status-pending',
   Canceled: 'restaurant-status restaurant-status-canceled',
+  Cancelled: 'restaurant-status restaurant-status-canceled',
+  'No-show': 'restaurant-status restaurant-status-canceled',
 };
 
 const managementLinks = [
@@ -88,25 +20,127 @@ const managementLinks = [
   { to: '/admin/restaurant-info', label: 'Manage Restaurant Info' },
 ];
 
-const AdminDashboard = () => {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
+const formatReservationDateTime = (reservation) => {
+  const date = reservation.date
+    ? new Intl.DateTimeFormat('en-AU', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }).format(new Date(reservation.date))
+    : 'No date';
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  if (reservation.timeSlot) {
+    return `${date}, ${reservation.timeSlot.startTime} - ${reservation.timeSlot.endTime}`;
+  }
+
+  return `${date}, Not assigned`;
+};
+
+const reservationCustomerName = (reservation) =>
+  reservation.customer?.name || reservation.customerName || 'Unknown customer';
+
+const reservationId = (reservation) =>
+  reservation._id ? `R${reservation._id.slice(-7).toUpperCase()}` : 'Reservation';
+
+const AdminDashboard = () => {
+  const { user } = useAuth();
+  const [reservations, setReservations] = useState([]);
+  const [tables, setTables] = useState([]);
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+
+  const authConfig = {
+    headers: { Authorization: `Bearer ${user.token}` },
   };
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      setLoading(true);
+      setMessage({ type: '', text: '' });
+
+      try {
+        const [reservationResponse, tableResponse, timeSlotResponse] = await Promise.all([
+          axiosInstance.get('/api/reservations/admin', authConfig),
+          axiosInstance.get('/api/tables', authConfig),
+          axiosInstance.get('/api/time-slots', authConfig),
+        ]);
+
+        setReservations(reservationResponse.data);
+        setTables(tableResponse.data);
+        setTimeSlots(timeSlotResponse.data);
+      } catch (error) {
+        setMessage({
+          type: 'error',
+          text: error.response?.data?.message || 'Failed to load dashboard data.',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const stats = useMemo(
+    () => [
+      {
+        label: 'Total Reservations',
+        value: reservations.length,
+        period: 'All time',
+        accent: 'bg-[#dff7d4] text-[#016630]',
+        icon: 'Cal',
+      },
+      {
+        label: 'Confirmed Reservations',
+        value: reservations.filter((reservation) => reservation.status === 'Confirmed').length,
+        period: 'All time',
+        accent: 'bg-[#dfeedd] text-[#386b34]',
+        icon: 'Ok',
+      },
+      {
+        label: 'Cancelled Reservations',
+        value: reservations.filter((reservation) =>
+          ['Cancelled', 'Canceled'].includes(reservation.status)
+        ).length,
+        period: 'All time',
+        accent: 'bg-[#f0dfdc] text-[#9b3d32]',
+        icon: 'No',
+      },
+      {
+        label: 'Available Tables',
+        value: tables.filter((table) => table.isAvailable).length,
+        period: 'All time',
+        accent: 'bg-[#e4dfef] text-[#5a4d7c]',
+        icon: 'Tbl',
+      },
+      {
+        label: 'Open Time Slots',
+        value: timeSlots.filter((timeSlot) => timeSlot.isAvailable).length,
+        period: 'All time',
+        accent: 'bg-[#e5f4f7] text-[#12616d]',
+        icon: 'Slot',
+      },
+    ],
+    [reservations, tables, timeSlots]
+  );
+
+  const recentReservations = useMemo(
+    () =>
+      [...reservations]
+        .sort((first, second) => new Date(second.date) - new Date(first.date))
+        .slice(0, 4),
+    [reservations]
+  );
 
   return (
     <main className="restaurant-admin-page px-6 py-10">
       <section className="mx-auto max-w-[1376px]">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-6">
           <h1 className="font-serif text-5xl font-semibold text-stone-950">
             Admin Dashboard
           </h1>
-          <button type="button" onClick={handleLogout} className="restaurant-button w-[130px]">
-            Logout
-          </button>
         </div>
 
         <section className="grid gap-8 xl:grid-cols-[280px_minmax(0,1fr)]">
@@ -127,6 +161,10 @@ const AdminDashboard = () => {
           </aside>
 
           <div>
+            {message.text && (
+              <p className="restaurant-message-error mb-6">{message.text}</p>
+            )}
+
             <section className="grid gap-8 md:grid-cols-2 2xl:grid-cols-5">
               {stats.map((stat) => (
                 <article key={stat.label} className="admin-stat-card">
@@ -165,19 +203,25 @@ const AdminDashboard = () => {
                   <span>Status</span>
                 </div>
 
-                {reservations.map((reservation) => (
-                  <div key={reservation.id} className="admin-dashboard-row">
-                    <span>{reservation.id}</span>
-                    <span>{reservation.customer}</span>
-                    <span>{reservation.dateTime}</span>
-                    <span>{reservation.guests}</span>
-                    <span>
-                      <span className={statusClass[reservation.status]}>
-                        {reservation.status}
+                {loading ? (
+                  <div className="p-6 text-xl text-stone-700">Loading reservations...</div>
+                ) : recentReservations.length ? (
+                  recentReservations.map((reservation) => (
+                    <div key={reservation._id} className="admin-dashboard-row">
+                      <span>{reservationId(reservation)}</span>
+                      <span>{reservationCustomerName(reservation)}</span>
+                      <span>{formatReservationDateTime(reservation)}</span>
+                      <span>{reservation.guests}</span>
+                      <span>
+                        <span className={statusClass[reservation.status] || 'restaurant-status'}>
+                          {reservation.status}
+                        </span>
                       </span>
-                    </span>
-                  </div>
-                ))}
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-6 text-xl text-stone-700">No reservations have been created yet.</div>
+                )}
               </div>
             </article>
           </div>
