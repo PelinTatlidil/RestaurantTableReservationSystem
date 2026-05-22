@@ -14,6 +14,7 @@ app.use(express.json());
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/restaurant-info', require('./routes/restaurantInfoRoutes'));
 app.use('/api/tables', require('./routes/tableRoutes'));
+app.use('/api/time-slots', require('./routes/timeSlotRoutes'));
 //app.use('/api/tasks', require('./routes/taskRoutes'));
 
 // Export the app object for testing

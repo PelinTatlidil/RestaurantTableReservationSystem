@@ -12,6 +12,7 @@ import MakeReservation from './pages/MakeReservation';
 import ReservationConfirmation from './pages/ReservationConfirmation';
 import CustomerPanel from './pages/CustomerPanel';
 import AdminManagementPage from './pages/AdminManagementPage';
+import ManageTimeSlots from './pages/ManageTimeSlots';
 
 const RequireRole = ({ children, role }) => {
   const { user } = useAuth();
@@ -93,10 +94,7 @@ function App() {
           path="/admin/time-slots"
           element={
             <RequireRole role="admin">
-              <AdminManagementPage
-                title="Time Slot Management"
-                description="Configure available reservation time slots."
-              />
+              <ManageTimeSlots />
             </RequireRole>
           }
         />

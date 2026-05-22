@@ -1,18 +1,47 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axiosInstance from '../axiosConfig';
+import { useAuth } from '../context/AuthContext';
 
 const MakeReservation = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     date: '',
-    time: '',
+    timeSlotId: '',
     guests: '',
     tablePreference: '',
     requests: '',
   });
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [message, setMessage] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    const fetchAvailableTimeSlots = async () => {
+      try {
+        const response = await axiosInstance.get('/api/time-slots/available', {
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+        setTimeSlots(response.data);
+      } catch (error) {
+        setMessage({
+          type: 'error',
+          text: 'Failed to load available time slots.',
+        });
+      }
+    };
+
+    fetchAvailableTimeSlots();
+  }, [user]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
+
+    if (!formData.timeSlotId) {
+      setMessage({ type: 'error', text: 'Please select an available time slot.' });
+      return;
+    }
+
     navigate('/reservation-confirmation');
   };
 
@@ -35,12 +64,19 @@ const MakeReservation = () => {
               />
             </label>
             <label className="restaurant-field">
-              <span>Time</span>
-              <input
-                type="time"
-                value={formData.time}
-                onChange={(event) => setFormData({ ...formData, time: event.target.value })}
-              />
+              <span>Available Time Slot</span>
+              <select
+                value={formData.timeSlotId}
+                onChange={(event) => setFormData({ ...formData, timeSlotId: event.target.value })}
+                className="restaurant-input"
+              >
+                <option value="">Select a time slot</option>
+                {timeSlots.map((slot) => (
+                  <option key={slot._id} value={slot._id}>
+                    {slot.startTime} - {slot.endTime}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="restaurant-field">
               <span>Number of Guests</span>
@@ -74,6 +110,18 @@ const MakeReservation = () => {
               onChange={(event) => setFormData({ ...formData, requests: event.target.value })}
             />
           </label>
+
+          {message.text && (
+            <p
+              className={
+                message.type === 'error'
+                  ? 'restaurant-message-error'
+                  : 'restaurant-message-success'
+              }
+            >
+              {message.text}
+            </p>
+          )}
 
           <div className="flex justify-end gap-7 pt-3">
             <button type="submit" className="restaurant-button w-[130px]">
