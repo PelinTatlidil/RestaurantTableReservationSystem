@@ -82,6 +82,22 @@ const changeCheckboxValue = (input, checked) => {
   input.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
+const changeSelectValue = (select, value) => {
+  const valueSetter = Object.getOwnPropertyDescriptor(select, 'value')?.set;
+  const prototype = Object.getPrototypeOf(select);
+  const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+
+  if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
+    prototypeValueSetter.call(select, value);
+  } else if (valueSetter) {
+    valueSetter.call(select, value);
+  } else {
+    select.value = value;
+  }
+
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
 describe('logout and protected access', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -453,6 +469,203 @@ describe('admin table management', () => {
       });
       expect(container.textContent).toContain('Table deleted successfully.');
     });
+  });
+});
+
+describe('admin time slot management', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+    }
+    if (container) {
+      document.body.removeChild(container);
+    }
+    root = null;
+    container = null;
+  });
+
+  const setAdminSession = () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+  };
+
+  test('admin can add, update, and delete time slots', async () => {
+    setAdminSession();
+    axiosInstance.get.mockResolvedValue({
+      data: [
+        {
+          _id: 'slot-1',
+          startTime: '17:00',
+          endTime: '18:00',
+          isAvailable: true,
+        },
+      ],
+    });
+    axiosInstance.post.mockResolvedValue({
+      data: {
+        _id: 'slot-2',
+        startTime: '18:00',
+        endTime: '19:00',
+        isAvailable: true,
+      },
+    });
+    axiosInstance.put.mockResolvedValue({
+      data: {
+        _id: 'slot-1',
+        startTime: '17:30',
+        endTime: '18:30',
+        isAvailable: true,
+      },
+    });
+    axiosInstance.delete.mockResolvedValue({ data: { message: 'Time slot deleted successfully' } });
+
+    await renderAppAt('/admin/time-slots');
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/time-slots', {
+        headers: { Authorization: 'Bearer admin-token' },
+      });
+      expect(container.textContent).toContain('17:00');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Add Time Slot')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      const timeInputs = container.querySelectorAll('input[type="time"]');
+      changeInputValue(timeInputs[0], '18:00');
+      changeInputValue(timeInputs[1], '19:00');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.post).toHaveBeenCalledWith(
+        '/api/time-slots',
+        {
+          startTime: '18:00',
+          endTime: '19:00',
+          isAvailable: true,
+        },
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Time slot added successfully.');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.getAttribute('aria-label') === 'Edit time slot 17:00')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await act(async () => {
+      const timeInputs = container.querySelectorAll('input[type="time"]');
+      changeInputValue(timeInputs[0], '17:30');
+      changeInputValue(timeInputs[1], '18:30');
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.put).toHaveBeenCalledWith(
+        '/api/time-slots/slot-1',
+        {
+          startTime: '17:30',
+          endTime: '18:30',
+          isAvailable: true,
+        },
+        {
+          headers: { Authorization: 'Bearer admin-token' },
+        }
+      );
+      expect(container.textContent).toContain('Time slot updated successfully.');
+    });
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.getAttribute('aria-label') === 'Delete time slot 18:00')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      expect(axiosInstance.delete).toHaveBeenCalledWith('/api/time-slots/slot-2', {
+        headers: { Authorization: 'Bearer admin-token' },
+      });
+      expect(container.textContent).toContain('Time slot deleted successfully.');
+    });
+  });
+});
+
+describe('customer reservation time slots', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+    }
+    if (container) {
+      document.body.removeChild(container);
+    }
+    root = null;
+    container = null;
+  });
+
+  test('customer can only select available time slots', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get.mockResolvedValue({
+      data: [
+        {
+          _id: 'slot-1',
+          startTime: '17:00',
+          endTime: '18:00',
+          isAvailable: true,
+        },
+      ],
+    });
+
+    await renderAppAt('/make-reservation');
+
+    await waitFor(() => {
+      expect(axiosInstance.get).toHaveBeenCalledWith('/api/time-slots/available', {
+        headers: { Authorization: 'Bearer customer-token' },
+      });
+      expect(container.textContent).toContain('17:00 - 18:00');
+    });
+
+    await act(async () => {
+      changeSelectValue(container.querySelector('select'), 'slot-1');
+    });
+
+    expect(container.querySelector('select').value).toBe('slot-1');
   });
 });
 
