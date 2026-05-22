@@ -30,6 +30,13 @@ const stats = [
     accent: 'bg-[#e4dfef] text-[#5a4d7c]',
     icon: 'Tbl',
   },
+  {
+    label: 'Open Time Slots',
+    value: '42',
+    period: 'This week',
+    accent: 'bg-[#e5f4f7] text-[#12616d]',
+    icon: 'Slot',
+  },
 ];
 
 const reservations = [
@@ -73,6 +80,14 @@ const statusClass = {
   Canceled: 'restaurant-status restaurant-status-canceled',
 };
 
+const managementLinks = [
+  { to: '/admin/reservations', label: 'Manage Reservations' },
+  { to: '/tasks', label: 'Manage Tables' },
+  { to: '/admin/time-slots', label: 'Manage Time Slots' },
+  { to: '/admin/users', label: 'Manage Users' },
+  { to: '/admin/restaurant-info', label: 'Manage Restaurant Info' },
+];
+
 const AdminDashboard = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -94,82 +109,78 @@ const AdminDashboard = () => {
           </button>
         </div>
 
-        <section className="grid gap-8 xl:grid-cols-4">
-          {stats.map((stat) => (
-            <article key={stat.label} className="admin-stat-card">
-              <div className={`admin-stat-icon ${stat.accent}`} aria-hidden="true">
-                {stat.icon}
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold leading-snug text-stone-900">
-                  {stat.label}
-                </h2>
-                <p className="mt-3 text-4xl font-semibold text-stone-950">
-                  {stat.value}
-                </p>
-                <p className="mt-2 text-base text-stone-600">{stat.period}</p>
-              </div>
-            </article>
-          ))}
-        </section>
-
-        <section className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,963px)_1fr]">
-          <article className="admin-panel">
-            <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="font-serif text-3xl font-semibold text-stone-950">
-                Recent Reservations
-              </h2>
-              <Link to="/my-reservations" className="text-lg font-semibold text-[#016630]">
-                View all reservations
-              </Link>
-            </div>
-
-            <div className="admin-dashboard-table">
-              <div className="admin-dashboard-row admin-dashboard-head">
-                <span>Reservation ID</span>
-                <span>Customer</span>
-                <span>Date and Time</span>
-                <span>Guests</span>
-                <span>Status</span>
-              </div>
-
-              {reservations.map((reservation) => (
-                <div key={reservation.id} className="admin-dashboard-row">
-                  <span>{reservation.id}</span>
-                  <span>{reservation.customer}</span>
-                  <span>{reservation.dateTime}</span>
-                  <span>{reservation.guests}</span>
-                  <span>
-                    <span className={statusClass[reservation.status]}>
-                      {reservation.status}
-                    </span>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <aside className="admin-panel admin-actions">
+        <section className="grid gap-8 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="admin-panel admin-actions xl:sticky xl:top-[124px]">
             <h2 className="font-serif text-3xl font-semibold text-stone-950">
-              Quick Actions
+              Management
             </h2>
 
-            <Link to="/tasks" className="restaurant-button">
-              Manage Tables
-            </Link>
-
-            <Link to="/my-reservations" className="restaurant-button restaurant-button-secondary">
-              Manage Reservations
-            </Link>
-
-            <button type="button" className="restaurant-button restaurant-button-secondary">
-              Manage Users
-            </button>
-
-            <button type="button" className="restaurant-button restaurant-button-secondary">
-              Restaurant Info
-            </button>
+            {managementLinks.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className="restaurant-button w-full"
+              >
+                {item.label}
+              </Link>
+            ))}
           </aside>
+
+          <div>
+            <section className="grid gap-8 md:grid-cols-2 2xl:grid-cols-5">
+              {stats.map((stat) => (
+                <article key={stat.label} className="admin-stat-card">
+                  <div className={`admin-stat-icon ${stat.accent}`} aria-hidden="true">
+                    {stat.icon}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold leading-snug text-stone-900">
+                      {stat.label}
+                    </h2>
+                    <p className="mt-3 text-4xl font-semibold text-stone-950">
+                      {stat.value}
+                    </p>
+                    <p className="mt-2 text-base text-stone-600">{stat.period}</p>
+                  </div>
+                </article>
+              ))}
+            </section>
+
+            <article className="admin-panel mt-10">
+              <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="font-serif text-3xl font-semibold text-stone-950">
+                  Recent Reservations
+                </h2>
+                <Link to="/admin/reservations" className="text-lg font-semibold text-[#016630]">
+                  View all reservations
+                </Link>
+              </div>
+
+              <div className="admin-dashboard-table">
+                <div className="admin-dashboard-row admin-dashboard-head">
+                  <span>Reservation ID</span>
+                  <span>Customer</span>
+                  <span>Date and Time</span>
+                  <span>Guests</span>
+                  <span>Status</span>
+                </div>
+
+                {reservations.map((reservation) => (
+                  <div key={reservation.id} className="admin-dashboard-row">
+                    <span>{reservation.id}</span>
+                    <span>{reservation.customer}</span>
+                    <span>{reservation.dateTime}</span>
+                    <span>{reservation.guests}</span>
+                    <span>
+                      <span className={statusClass[reservation.status]}>
+                        {reservation.status}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
         </section>
       </section>
     </main>

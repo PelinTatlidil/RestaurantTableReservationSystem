@@ -32,14 +32,21 @@ const Navbar = () => {
                 <NavLink to="/admin-dashboard" className={linkClass}>
                   Dashboard
                 </NavLink>
-                <NavLink to="/my-reservations" className={linkClass}>
+                <NavLink to="/admin/reservations" className={linkClass}>
                   Reservations
                 </NavLink>
                 <NavLink to="/tasks" className={linkClass}>
                   Tables
                 </NavLink>
-                <span className="restaurant-nav-link">Users</span>
-                <span className="restaurant-nav-link">Restaurant Info</span>
+                <NavLink to="/admin/time-slots" className={linkClass}>
+                  Time Slots
+                </NavLink>
+                <NavLink to="/admin/users" className={linkClass}>
+                  Users
+                </NavLink>
+                <NavLink to="/admin/restaurant-info" className={linkClass}>
+                  Restaurant Info
+                </NavLink>
               </>
             ) : (
               <>
@@ -54,6 +61,9 @@ const Navbar = () => {
                 </NavLink>
               </>
             )}
+            <span className="restaurant-nav-user">
+              {user.name || user.email}
+            </span>
             <button
               onClick={handleLogout}
               className="restaurant-nav-link"

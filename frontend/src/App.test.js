@@ -196,6 +196,77 @@ describe('restaurant information page', () => {
   });
 });
 
+describe('admin dashboard access and navigation', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+    }
+    if (container) {
+      document.body.removeChild(container);
+    }
+    root = null;
+    container = null;
+  });
+
+  test('admin can access dashboard and see management links', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'admin-id',
+        name: 'Admin A',
+        email: 'admin@example.com',
+        role: 'admin',
+        token: 'admin-token',
+      })
+    );
+
+    await renderAppAt('/admin-dashboard');
+
+    expect(container.textContent).toContain('Admin Dashboard');
+    expect(container.textContent).toContain('Total Reservations');
+    expect(container.textContent).toContain('Open Time Slots');
+    expect(container.querySelector('a[href="/admin/reservations"]')).toBeTruthy();
+    expect(container.querySelector('a[href="/tasks"]')).toBeTruthy();
+    expect(container.querySelector('a[href="/admin/time-slots"]')).toBeTruthy();
+    expect(container.querySelector('a[href="/admin/users"]')).toBeTruthy();
+    expect(container.querySelector('a[href="/admin/restaurant-info"]')).toBeTruthy();
+  });
+
+  test('customer cannot access admin dashboard', async () => {
+    localStorage.setItem(
+      'user',
+      JSON.stringify({
+        id: 'customer-id',
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+        token: 'customer-token',
+      })
+    );
+    axiosInstance.get.mockResolvedValue({
+      data: {
+        name: 'Customer A',
+        email: 'customer@example.com',
+        phone: '0400123456',
+        role: 'customer',
+      },
+    });
+
+    await renderAppAt('/admin-dashboard');
+
+    await waitFor(() => {
+      expect(container.textContent).not.toContain('Admin Dashboard');
+      expect(container.textContent).toContain('Manage your restaurant bookings');
+    });
+  });
+});
+
 describe('customer profile management', () => {
   beforeEach(() => {
     localStorage.clear();
