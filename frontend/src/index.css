@@ -64,6 +64,17 @@
     color: #016630;
   }
 
+  .restaurant-nav-user {
+    border: 1px solid rgba(1, 102, 48, 0.16);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.58);
+    color: #016630;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.4;
+    padding: 0.55rem 0.8rem;
+  }
+
   .restaurant-button {
     display: inline-flex;
     min-height: 49px;

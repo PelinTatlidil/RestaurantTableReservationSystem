@@ -11,6 +11,7 @@ import MyReservations from './pages/MyReservations';
 import MakeReservation from './pages/MakeReservation';
 import ReservationConfirmation from './pages/ReservationConfirmation';
 import CustomerPanel from './pages/CustomerPanel';
+import AdminManagementPage from './pages/AdminManagementPage';
 
 const RequireRole = ({ children, role }) => {
   const { user } = useAuth();
@@ -63,6 +64,50 @@ function App() {
           element={
             <RequireRole role="admin">
               <Tasks />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/admin/reservations"
+          element={
+            <RequireRole role="admin">
+              <AdminManagementPage
+                title="Reservation Management"
+                description="Review, update, and manage customer reservations."
+              />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <RequireRole role="admin">
+              <AdminManagementPage
+                title="User Management"
+                description="Manage customer and admin user accounts."
+              />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/admin/time-slots"
+          element={
+            <RequireRole role="admin">
+              <AdminManagementPage
+                title="Time Slot Management"
+                description="Configure available reservation time slots."
+              />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/admin/restaurant-info"
+          element={
+            <RequireRole role="admin">
+              <AdminManagementPage
+                title="Restaurant Information Management"
+                description="Maintain restaurant contact details, opening hours, and booking policy."
+              />
             </RequireRole>
           }
         />
