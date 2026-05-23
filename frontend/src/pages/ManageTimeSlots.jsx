@@ -8,6 +8,11 @@ const emptyForm = {
   isAvailable: true,
 };
 
+const toMinutes = (time) => {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
 const ManageTimeSlots = () => {
   const { user } = useAuth();
   const [timeSlots, setTimeSlots] = useState([]);
@@ -56,6 +61,10 @@ const ManageTimeSlots = () => {
 
     if (formData.startTime >= formData.endTime) {
       return 'End time must be after start time.';
+    }
+
+    if (toMinutes(formData.endTime) - toMinutes(formData.startTime) !== 120) {
+      return 'Reservation slots must be exactly 2 hours long.';
     }
 
     return '';

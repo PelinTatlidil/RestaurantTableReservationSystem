@@ -37,10 +37,12 @@ const reservedStatuses = ['Pending', 'Confirmed'];
 const getReservationDate = (reservation) => (reservation.date ? reservation.date.slice(0, 10) : '');
 
 const getReservationTableId = (reservation) =>
-  typeof reservation.table === 'string' ? reservation.table : reservation.table?._id;
+  typeof reservation.table === 'string' ? reservation.table : reservation.table?._id || reservation.table?.id;
 
 const getReservationTimeSlotId = (reservation) =>
-  typeof reservation.timeSlot === 'string' ? reservation.timeSlot : reservation.timeSlot?._id;
+  typeof reservation.timeSlot === 'string'
+    ? reservation.timeSlot
+    : reservation.timeSlot?._id || reservation.timeSlot?.id;
 
 const reservationToFormData = (reservation) => ({
   customerName: reservation.customer?.name || reservation.customerName || '',
@@ -141,6 +143,34 @@ const AdminReservations = () => {
       (editingReservation && table._id === formData.table)
   );
   const availableTimeSlots = timeSlots.filter((timeSlot) => timeSlot.isAvailable);
+  const timeSlotOptions = useMemo(() => {
+    if (!editingReservation || !formData.timeSlot) {
+      return availableTimeSlots;
+    }
+
+    const hasCurrentTimeSlot = availableTimeSlots.some(
+      (timeSlot) => timeSlot._id === formData.timeSlot
+    );
+
+    if (hasCurrentTimeSlot || typeof editingReservation.timeSlot !== 'object') {
+      return availableTimeSlots;
+    }
+
+    return [editingReservation.timeSlot, ...availableTimeSlots];
+  }, [availableTimeSlots, editingReservation, formData.timeSlot]);
+  const tableOptions = useMemo(() => {
+    if (!editingReservation || !formData.table) {
+      return availableTables;
+    }
+
+    const hasCurrentTable = availableTables.some((table) => table._id === formData.table);
+
+    if (hasCurrentTable || typeof editingReservation.table !== 'object') {
+      return availableTables;
+    }
+
+    return [editingReservation.table, ...availableTables];
+  }, [availableTables, editingReservation, formData.table]);
   const selectedTable = tables.find((table) => table._id === formData.table);
 
   useEffect(() => {
@@ -447,7 +477,7 @@ const AdminReservations = () => {
                 }
               >
                 <option value="">Select time slot</option>
-                {availableTimeSlots.map((timeSlot) => (
+                {timeSlotOptions.map((timeSlot) => (
                   <option key={timeSlot._id} value={timeSlot._id}>
                     {timeSlot.startTime} - {timeSlot.endTime}
                   </option>
@@ -461,12 +491,12 @@ const AdminReservations = () => {
                 onChange={(event) => setFormData({ ...formData, table: event.target.value })}
               >
                 <option value="">Select table</option>
-                {availableTables.map((table) => (
+                {tableOptions.map((table) => (
                   <option key={table._id} value={table._id}>
                     Table {table.tableNumber} - {table.capacity} guests - {table.location}
                   </option>
                 ))}
-                {!availableTables.length && formData.date && formData.timeSlot && (
+                {!tableOptions.length && formData.date && formData.timeSlot && (
                   <option value="" disabled>
                     No tables available for this date and time
                   </option>

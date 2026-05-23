@@ -1091,7 +1091,7 @@ describe('admin time slot management', () => {
         {
           _id: 'slot-1',
           startTime: '17:00',
-          endTime: '18:00',
+          endTime: '19:00',
           isAvailable: true,
         },
       ],
@@ -1099,16 +1099,16 @@ describe('admin time slot management', () => {
     axiosInstance.post.mockResolvedValue({
       data: {
         _id: 'slot-2',
-        startTime: '18:00',
-        endTime: '19:00',
+        startTime: '19:00',
+        endTime: '21:00',
         isAvailable: true,
       },
     });
     axiosInstance.put.mockResolvedValue({
       data: {
         _id: 'slot-1',
-        startTime: '17:30',
-        endTime: '18:30',
+        startTime: '18:00',
+        endTime: '20:00',
         isAvailable: true,
       },
     });
@@ -1132,8 +1132,8 @@ describe('admin time slot management', () => {
 
     await act(async () => {
       const timeInputs = container.querySelectorAll('input[type="time"]');
-      changeInputValue(timeInputs[0], '18:00');
-      changeInputValue(timeInputs[1], '19:00');
+      changeInputValue(timeInputs[0], '19:00');
+      changeInputValue(timeInputs[1], '21:00');
       container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
 
@@ -1141,8 +1141,8 @@ describe('admin time slot management', () => {
       expect(axiosInstance.post).toHaveBeenCalledWith(
         '/api/time-slots',
         {
-          startTime: '18:00',
-          endTime: '19:00',
+          startTime: '19:00',
+          endTime: '21:00',
           isAvailable: true,
         },
         {
@@ -1160,8 +1160,8 @@ describe('admin time slot management', () => {
 
     await act(async () => {
       const timeInputs = container.querySelectorAll('input[type="time"]');
-      changeInputValue(timeInputs[0], '17:30');
-      changeInputValue(timeInputs[1], '18:30');
+      changeInputValue(timeInputs[0], '18:00');
+      changeInputValue(timeInputs[1], '20:00');
       container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
 
@@ -1169,8 +1169,8 @@ describe('admin time slot management', () => {
       expect(axiosInstance.put).toHaveBeenCalledWith(
         '/api/time-slots/slot-1',
         {
-          startTime: '17:30',
-          endTime: '18:30',
+          startTime: '18:00',
+          endTime: '20:00',
           isAvailable: true,
         },
         {
@@ -1182,7 +1182,7 @@ describe('admin time slot management', () => {
 
     await act(async () => {
       Array.from(container.querySelectorAll('button'))
-        .find((button) => button.getAttribute('aria-label') === 'Delete time slot 18:00')
+        .find((button) => button.getAttribute('aria-label') === 'Delete time slot 19:00')
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
@@ -1341,6 +1341,14 @@ describe('admin reservation management', () => {
       Array.from(container.querySelectorAll('button'))
         .find((button) => button.textContent === 'Edit')
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await waitFor(() => {
+      const selects = container.querySelectorAll('form select');
+      expect(selects[0].value).toBe('slot-1');
+      expect(selects[0].textContent).toContain('18:00 - 19:00');
+      expect(selects[1].value).toBe('table-1');
+      expect(selects[1].textContent).toContain('Table 1');
     });
 
     await act(async () => {
