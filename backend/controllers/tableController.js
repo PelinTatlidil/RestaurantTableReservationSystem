@@ -1,4 +1,5 @@
 const Table = require('../models/Table');
+const BaseController = require('./BaseController');
 
 const normalizeTablePayload = (body) => ({
   tableNumber: Number(body.tableNumber),
@@ -124,11 +125,26 @@ const toggleTableAvailability = async (req, res) => {
   }
 };
 
-module.exports = {
+class TableController extends BaseController {
+  async getTables(req, res) {
+    try {
+      const tables = await Table.find().sort({ tableNumber: 1 });
+      return this.sendSuccess(res, tables);
+    } catch (error) {
+      return this.handleServerError(res, error);
+    }
+  }
+}
+
+const tableController = new TableController();
+
+Object.assign(tableController, {
+  getTables: tableController.getTables.bind(tableController),
   createTable,
   deleteTable,
-  getTables,
   toggleTableAvailability,
   updateTable,
   validateTablePayload,
-};
+});
+
+module.exports = tableController;

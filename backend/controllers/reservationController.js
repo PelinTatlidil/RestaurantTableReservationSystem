@@ -4,6 +4,7 @@ const ReservationStatusAudit = require('../models/ReservationStatusAudit');
 const Table = require('../models/Table');
 const TimeSlot = require('../models/TimeSlot');
 const User = require('../models/User');
+const BaseController = require('./BaseController');
 
 const reservationStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'No-show'];
 const activeBookingStatuses = ['Pending', 'Confirmed'];
@@ -635,7 +636,26 @@ const updateReservationStatus = async (req, res) => {
   }
 };
 
-module.exports = {
+class ReservationController extends BaseController {
+  async getAdminReservations(req, res) {
+    try {
+      const reservations = await Reservation.find({ isDeleted: { $ne: true } })
+        .populate('customer', 'name email phone')
+        .populate('timeSlot', 'startTime endTime')
+        .populate('table', 'tableNumber capacity location isAvailable')
+        .sort({ date: 1, createdAt: -1 });
+
+      return this.sendSuccess(res, reservations);
+    } catch (error) {
+      return this.handleServerError(res, error);
+    }
+  }
+}
+
+const reservationController = new ReservationController();
+
+Object.assign(reservationController, {
+  getAdminReservations: reservationController.getAdminReservations.bind(reservationController),
   cancelCustomerReservation,
   checkCustomerReservationAvailability,
   checkReservationAvailability,
@@ -643,11 +663,12 @@ module.exports = {
   createCustomerReservation,
   deleteAdminReservation,
   findSuitableAvailableTable,
-  getAdminReservations,
   getCustomerReservations,
   updateAdminReservation,
   updateCustomerReservation,
   updateReservationStatus,
   validateCustomerReservationPayload,
   validateReservationPayload,
-};
+});
+
+module.exports = reservationController;
