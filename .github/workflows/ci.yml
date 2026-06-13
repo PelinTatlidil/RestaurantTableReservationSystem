@@ -1,0 +1,165 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Verify backend test environment
+        run: |
+          missing=0
+          for name in JWT_SECRET MONGO_URI PORT; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not configured for backend tests"
+              missing=1
+            else
+              echo "$name is configured"
+            fi
+          done
+          exit $missing
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          PORT: ${{ secrets.PORT }}
+
+      - name: Run backend tests
+        run: npm test
+        working-directory: backend
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          PORT: ${{ secrets.PORT }}
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Run frontend tests
+        run: npm test -- --watchAll=false
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+
+  deploy:
+    name: Deploy to AWS EC2
+    needs:
+      - backend-tests
+      - frontend-build
+    runs-on: self-hosted
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Stop existing PM2 process
+        run: pm2 stop restaurant-backend || true
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+
+      - name: Create backend production environment file
+        env:
+          PROD: ${{ secrets.PROD }}
+        run: |
+          if [ -z "$PROD" ]; then
+            echo "::error::PROD is not configured for deployment"
+            exit 1
+          fi
+          rm -f .env
+          printf '%s' "$PROD" > .env
+        working-directory: backend
+
+      - name: Deploy frontend to Nginx
+        run: |
+          sudo rm -rf /var/www/html/*
+          sudo cp -r frontend/build/* /var/www/html/
+
+      - name: Configure Nginx for React and API proxy
+        run: |
+          BACKEND_PORT="$(grep -E '^PORT=' backend/.env | tail -n 1 | cut -d '=' -f2- | tr -d '\r' || true)"
+          BACKEND_PORT="${BACKEND_PORT:-5001}"
+
+          sudo tee /etc/nginx/sites-available/restaurant-table-reservation > /dev/null <<NGINX
+          server {
+            listen 80 default_server;
+            listen [::]:80 default_server;
+            server_name _;
+
+            root /var/www/html;
+            index index.html;
+
+            location /api/ {
+              proxy_pass http://127.0.0.1:${BACKEND_PORT}/api/;
+              proxy_http_version 1.1;
+              proxy_set_header Host \$host;
+              proxy_set_header X-Real-IP \$remote_addr;
+              proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto \$scheme;
+            }
+
+            location / {
+              try_files \$uri /index.html;
+            }
+          }
+          NGINX
+
+          sudo ln -sf /etc/nginx/sites-available/restaurant-table-reservation /etc/nginx/sites-enabled/restaurant-table-reservation
+          sudo rm -f /etc/nginx/sites-enabled/default
+          sudo nginx -t
+          sudo systemctl restart nginx
+
+      - name: Start or restart backend with PM2
+        run: |
+          pm2 describe restaurant-backend > /dev/null \
+            && pm2 restart restaurant-backend --update-env \
+          || pm2 start server.js --name restaurant-backend --update-env
+        working-directory: backend
+
+      - name: Save PM2 process list
+        run: pm2 save
