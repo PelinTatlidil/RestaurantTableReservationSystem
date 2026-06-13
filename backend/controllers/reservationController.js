@@ -5,6 +5,10 @@ const Table = require('../models/Table');
 const TimeSlot = require('../models/TimeSlot');
 const User = require('../models/User');
 const BaseController = require('./BaseController');
+const {
+  LargestCapacityStrategy,
+  SmallestCapacityStrategy,
+} = require('./TableSelectionStrategy');
 
 const reservationStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'No-show'];
 const activeBookingStatuses = ['Pending', 'Confirmed'];
@@ -253,7 +257,16 @@ const checkReservationAvailability = async ({ date, timeSlot, guests, excludeRes
   const bookedTableIds = new Set(
     bookedReservations.map((reservation) => String(reservation.table))
   );
-  const table = candidateTables.find((candidateTable) => !bookedTableIds.has(String(candidateTable._id)));
+
+  // Polymorphism example:
+  // both strategy classes implement the same `select()` method,
+  // so the controller can swap behavior without changing the API.
+  const selectionStrategy =
+    process.env.TABLE_SELECTION_STRATEGY === 'largest'
+      ? new LargestCapacityStrategy()
+      : new SmallestCapacityStrategy();
+
+  const table = selectionStrategy.select(candidateTables, bookedTableIds);
 
   if (!table) {
     return {
