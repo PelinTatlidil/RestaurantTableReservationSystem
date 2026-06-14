@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Reservation = require('../models/Reservation');
-const ReservationStatusAudit = require('../models/ReservationStatusAudit');
+const ReservationSubject = require('../observers/ReservationSubject');
+const CustomerNotificationObserver = require('../observers/CustomerNotificationObserver');
+const ReservationAuditObserver = require('../observers/ReservationAuditObserver');
 const Table = require('../models/Table');
 const TimeSlot = require('../models/TimeSlot');
 const User = require('../models/User');
@@ -9,6 +11,11 @@ const {
   LargestCapacityStrategy,
   SmallestCapacityStrategy,
 } = require('./TableSelectionStrategy');
+
+const reservationSubject = new ReservationSubject();
+
+reservationSubject.addObserver(new CustomerNotificationObserver());
+reservationSubject.addObserver(new ReservationAuditObserver());
 
 const reservationStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'No-show'];
 const activeBookingStatuses = ['Pending', 'Confirmed'];
@@ -628,19 +635,16 @@ const updateReservationStatus = async (req, res) => {
     const notificationMessage = `Your reservation status has been updated to ${newStatus}.`;
 
     reservation.status = newStatus;
-    reservation.customerNotification = {
-      message: notificationMessage,
-      updatedAt: new Date(),
-    };
 
-    await reservation.save();
-    await ReservationStatusAudit.create({
-      reservation: reservation._id,
-      changedBy: req.user._id,
+    await reservationSubject.notifyObservers({
+      reservation,
       previousStatus,
       newStatus,
+      changedBy: req.user._id,
       notificationMessage,
     });
+
+    await reservation.save();
 
     const populatedReservation = await populateReservationById(reservation._id);
     return res.status(200).json(populatedReservation);
