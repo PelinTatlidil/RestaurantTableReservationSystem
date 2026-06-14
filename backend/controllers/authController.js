@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const UserFactory = require('../factories/userFactory');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
@@ -35,12 +36,11 @@ const registerUser = async (req, res) => {
             });
         }
 
-        const user = await User.create({
+        const user = await UserFactory.createCustomer({
             name: name.trim(),
             email: normalizedEmail,
             phone: phone.trim(),
             password,
-            role: 'customer',
         });
 
         return res.status(201).json({
