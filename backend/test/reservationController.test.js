@@ -209,7 +209,6 @@ describe('Reservation controller unit tests', () => {
     };
     const populatedReservation = {
       _id: reservationId,
-      customer: customerId,
       status: 'Cancelled',
     };
     const { firstPopulate } = stubPopulateReservation(populatedReservation);
