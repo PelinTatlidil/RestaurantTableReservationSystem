@@ -11,6 +11,7 @@ const {
   LargestCapacityStrategy,
   SmallestCapacityStrategy,
 } = require('./TableSelectionStrategy');
+const { ReservationDataAccessProxy } = require('../proxies/AccessControlProxy');
 
 const reservationSubject = new ReservationSubject();
 
@@ -104,13 +105,19 @@ const reservationErrorMessage = (error) => {
 
 const getAdminReservations = async (req, res) => {
   try {
+    // PROXY PATTERN: Admin access to all reservations
     const reservations = await Reservation.find({ isDeleted: { $ne: true } })
       .populate('customer', 'name email phone')
       .populate('timeSlot', 'startTime endTime')
       .populate('table', 'tableNumber capacity location isAvailable')
       .sort({ date: 1, createdAt: -1 });
 
-    return res.status(200).json(reservations);
+    // Filter sensitive data based on admin role
+    const filteredReservations = reservations.map(res => 
+      ReservationDataAccessProxy.filterReservationData(res, 'admin')
+    );
+
+    return res.status(200).json(filteredReservations);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -118,6 +125,7 @@ const getAdminReservations = async (req, res) => {
 
 const getCustomerReservations = async (req, res) => {
   try {
+    // PROXY PATTERN: Customer access - only their own reservations
     const reservations = await Reservation.find({
       customer: req.user._id,
       isDeleted: { $ne: true },
@@ -126,7 +134,12 @@ const getCustomerReservations = async (req, res) => {
       .populate('table', 'tableNumber capacity location')
       .sort({ date: -1, createdAt: -1 });
 
-    return res.status(200).json(reservations);
+    // Filter sensitive data for customer view
+    const filteredReservations = reservations.map(res => 
+      ReservationDataAccessProxy.filterReservationData(res, 'customer', req.user._id, true)
+    );
+
+    return res.status(200).json(filteredReservations);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -404,9 +417,17 @@ const createCustomerReservation = async (req, res) => {
     });
     const populatedReservation = await populateReservationById(reservation._id);
 
+    // PROXY PATTERN: Filter response data for customer
+    const filteredReservation = ReservationDataAccessProxy.filterReservationData(
+      populatedReservation,
+      'customer',
+      req.user._id,
+      true
+    );
+
     return res.status(201).json({
       message: 'Reservation confirmed successfully',
-      reservation: populatedReservation,
+      reservation: filteredReservation,
     });
   } catch (error) {
     return res.status(500).json({ message: reservationErrorMessage(error) });
@@ -480,9 +501,17 @@ const updateCustomerReservation = async (req, res) => {
     const updatedReservation = await reservation.save();
     const populatedReservation = await populateReservationById(updatedReservation._id);
 
+    // PROXY PATTERN: Filter response data for customer
+    const filteredReservation = ReservationDataAccessProxy.filterReservationData(
+      populatedReservation,
+      'customer',
+      req.user._id,
+      true
+    );
+
     return res.status(200).json({
       message: 'Reservation updated successfully',
-      reservation: populatedReservation,
+      reservation: filteredReservation,
     });
   } catch (error) {
     return res.status(500).json({ message: reservationErrorMessage(error) });
@@ -514,9 +543,17 @@ const cancelCustomerReservation = async (req, res) => {
     const cancelledReservation = await reservation.save();
     const populatedReservation = await populateReservationById(cancelledReservation._id);
 
+    // PROXY PATTERN: Filter response data for customer
+    const filteredReservation = ReservationDataAccessProxy.filterReservationData(
+      populatedReservation,
+      'customer',
+      req.user._id,
+      true
+    );
+
     return res.status(200).json({
       message: 'Reservation cancelled successfully',
-      reservation: populatedReservation,
+      reservation: filteredReservation,
     });
   } catch (error) {
     return res.status(500).json({ message: reservationErrorMessage(error) });
@@ -544,7 +581,13 @@ const createAdminReservation = async (req, res) => {
     );
     const populatedReservation = await populateReservationById(reservation._id);
 
-    return res.status(201).json(populatedReservation);
+    // PROXY PATTERN: Return full data for admin
+    const filteredReservation = ReservationDataAccessProxy.filterReservationData(
+      populatedReservation,
+      'admin'
+    );
+
+    return res.status(201).json(filteredReservation);
   } catch (error) {
     return res.status(500).json({ message: reservationErrorMessage(error) });
   }
@@ -584,7 +627,13 @@ const updateAdminReservation = async (req, res) => {
     const updatedReservation = await reservation.save();
     const populatedReservation = await populateReservationById(updatedReservation._id);
 
-    return res.status(200).json(populatedReservation);
+    // PROXY PATTERN: Return full data for admin
+    const filteredReservation = ReservationDataAccessProxy.filterReservationData(
+      populatedReservation,
+      'admin'
+    );
+
+    return res.status(200).json(filteredReservation);
   } catch (error) {
     return res.status(500).json({ message: reservationErrorMessage(error) });
   }
@@ -647,7 +696,14 @@ const updateReservationStatus = async (req, res) => {
     await reservation.save();
 
     const populatedReservation = await populateReservationById(reservation._id);
-    return res.status(200).json(populatedReservation);
+
+    // PROXY PATTERN: Return full data for admin
+    const filteredReservation = ReservationDataAccessProxy.filterReservationData(
+      populatedReservation,
+      'admin'
+    );
+
+    return res.status(200).json(filteredReservation);
   } catch (error) {
     return res.status(500).json({ message: reservationErrorMessage(error) });
   }

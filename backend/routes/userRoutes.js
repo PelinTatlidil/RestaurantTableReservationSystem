@@ -5,19 +5,20 @@ const {
   getAdminUsers,
   updateAdminUser,
 } = require('../controllers/userController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, adminOnly } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-const adminOnly = (req, res, next) => {
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ message: 'Admin access required' });
-  }
+/**
+ * PROXY PATTERN: User Management Routes
+ * All routes restricted to admin-only access
+ * Protects sensitive user data (emails, phone numbers, addresses)
+ */
 
-  return next();
-};
-
+// Get all users - PROXY: Admin only access to sensitive user data
 router.get('/admin', protect, adminOnly, getAdminUsers);
+
+// Get, update, delete specific user - PROXY: Admin only access to individual user details
 router
   .route('/admin/:id')
   .get(protect, adminOnly, getAdminUserDetails)
