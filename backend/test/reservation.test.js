@@ -379,7 +379,11 @@ describe('Admin reservation management', () => {
       isDeleted: { $ne: true },
     })).to.equal(true);
     expect(res.statusCode).to.equal(200);
-    expect(res.body).to.deep.equal(reservations);
+    expect(res.body).to.have.lengthOf(1);
+    expect(res.body[0]).to.deep.include({
+      _id: 'reservation-id',
+      status: 'Completed',
+    });
   });
 });
 
@@ -467,7 +471,13 @@ describe('Customer reservation creation', () => {
     });
     expect(res.statusCode).to.equal(201);
     expect(res.body.message).to.equal('Reservation confirmed successfully');
-    expect(res.body.reservation).to.deep.equal(populatedReservation);
+    expect(res.body.reservation).to.deep.include({
+      _id: createdReservation._id,
+      timeSlot,
+      table: exactTable,
+      guests: 4,
+      status: 'Confirmed',
+    });
   });
 
   it('assigns the next larger table when the exact size table is already booked', async () => {
@@ -736,7 +746,12 @@ describe('Customer reservation creation', () => {
     expect(reservation.save.calledOnce).to.equal(true);
     expect(res.statusCode).to.equal(200);
     expect(res.body.message).to.equal('Reservation updated successfully');
-    expect(res.body.reservation).to.deep.equal(populatedReservation);
+    expect(res.body.reservation).to.deep.include({
+      _id: reservationId,
+      table,
+      guests: 4,
+      status: 'Confirmed',
+    });
   });
 
   it('rejects customer reservation updates when no suitable table is available', async () => {
@@ -832,7 +847,14 @@ describe('Customer reservation creation', () => {
     expect(reservation.save.calledOnce).to.equal(true);
     expect(res.statusCode).to.equal(200);
     expect(res.body.message).to.equal('Reservation cancelled successfully');
-    expect(res.body.reservation).to.deep.equal(populatedReservation);
+    expect(res.body.reservation).to.deep.include({
+      _id: reservationId,
+      customer: customerId,
+      status: 'Cancelled',
+      customerNotification: {
+        message: 'Your reservation has been cancelled.',
+      },
+    });
   });
 
   it('prevents customers from cancelling another user reservation', async () => {

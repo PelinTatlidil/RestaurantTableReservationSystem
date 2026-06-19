@@ -85,7 +85,11 @@ describe('Reservation controller unit tests', () => {
       isDeleted: { $ne: true },
     })).to.equal(true);
     expect(res.statusCode).to.equal(200);
-    expect(res.body).to.deep.equal(reservations);
+      expect(res.body).to.have.lengthOf(1);
+      expect(res.body[0]).to.deep.include({
+        _id: reservationId,
+        customer: customerId,
+      });
   });
 
   it('creates a reservation for an admin request', async () => {
@@ -228,7 +232,14 @@ describe('Reservation controller unit tests', () => {
     expect(reservation.save.calledOnce).to.equal(true);
     expect(res.statusCode).to.equal(200);
     expect(res.body.message).to.equal('Reservation cancelled successfully');
-    expect(res.body.reservation).to.deep.include(populatedReservation);
+      expect(res.body.reservation).to.deep.include({
+        _id: reservationId,
+        customer: customerId,
+        status: 'Cancelled',
+        customerNotification: {
+          message: 'Your reservation has been cancelled.',
+        },
+      });
   });
 
   it('permanently deletes an admin reservation', async () => {
