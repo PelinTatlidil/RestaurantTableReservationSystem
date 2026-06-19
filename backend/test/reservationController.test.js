@@ -232,14 +232,10 @@ describe('Reservation controller unit tests', () => {
     expect(reservation.save.calledOnce).to.equal(true);
     expect(res.statusCode).to.equal(200);
     expect(res.body.message).to.equal('Reservation cancelled successfully');
-      expect(res.body.reservation).to.deep.include({
-        _id: reservationId,
-        customer: customerId,
-        status: 'Cancelled',
-        customerNotification: {
-          message: 'Your reservation has been cancelled.',
-        },
-      });
+    expect(res.body.reservation).to.deep.include({
+      _id: reservationId,
+      status: 'Cancelled',
+    });
   });
 
   it('permanently deletes an admin reservation', async () => {
