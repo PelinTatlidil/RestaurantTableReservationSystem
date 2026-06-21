@@ -4,6 +4,18 @@
 
 This project is a Restaurant Table Reservation System. It allows customers to register, log in, make table reservations, view their reservations, update reservations, and cancel reservations. It also allows the admin user to manage reservations, tables, and dashboard information.
 
+## Backend Design Patterns
+
+The backend demonstrates several object-oriented design patterns to keep the reservation system organized, reusable, and easier to maintain.
+
+- Factory: user creation is centralized through a user factory so customer and admin accounts are created through controlled methods.
+- Singleton: the MongoDB connection is managed through a single shared database connection instance.
+- Middleware / Chain of Responsibility: Express requests pass through authentication, role-checking, and ownership-checking middleware before reaching controller logic.
+- Proxy: access-control proxy logic filters sensitive data and restricts operations based on user role and resource ownership.
+- Strategy: table selection can switch between different table-selection strategies without changing the reservation controller workflow.
+- Observer: reservation status changes notify registered observers, such as customer notification and audit logging observers.
+- Facade: controller-level methods provide simplified entry points for reservation, table, and user operations by hiding lower-level model and validation details.
+
 ## Public URL
 
 Frontend public URL:
