@@ -26,23 +26,6 @@ jobs:
         run: npm ci
         working-directory: backend
 
-      - name: Verify backend test environment
-        run: |
-          missing=0
-          for name in JWT_SECRET MONGO_URI PORT; do
-            if [ -z "${!name}" ]; then
-              echo "::error::$name is not configured for backend tests"
-              missing=1
-            else
-              echo "$name is configured"
-            fi
-          done
-          exit $missing
-        env:
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          MONGO_URI: ${{ secrets.MONGO_URI }}
-          PORT: ${{ secrets.PORT }}
-
       - name: Run backend tests
         run: npm test
         working-directory: backend

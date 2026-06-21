@@ -1,0 +1,724 @@
+{
+  "info": {
+    "_postman_id": "9342d84a-8da2-4e7b-a0c6-0ff37ad6ecfd",
+    "name": "My Collection",
+    "description": "### Welcome to Postman! This is your first collection. \n\nCollections are your starting point for building and testing APIs. You can use this one to:\n\n• Group related requests\n• Test your API in real-world scenarios\n• Document and share your requests\n\nUpdate the name and overview whenever you’re ready to make it yours.\n\n[Learn more about Postman Collections.](https://learning.postman.com/docs/collections/collections-overview/)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "50796354",
+    "_collection_link": "https://go.postman.co/collection/50796354-9342d84a-8da2-4e7b-a0c6-0ff37ad6ecfd?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Get available time slots",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let response = pm.response.json();",
+              "",
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response is an array\", function () {",
+              "    pm.expect(response).to.be.an(\"array\");",
+              "});",
+              "",
+              "if (response.length > 0) {",
+              "    pm.environment.set(\"time_slot_id\", response[0]._id);",
+              "    pm.environment.set(\"time_slot_label\", response[0].startTime + \" - \" + response[0].endTime);",
+              "",
+              "    console.log(\"Saved time slot:\", response[0].startTime + \" - \" + response[0].endTime);",
+              "    console.log(\"Saved time_slot_id:\", response[0]._id);",
+              "} else {",
+              "    console.warn(\"No available time slots found\");",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://52.65.216.208:5001/api/time-slots/available",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "port": "5001",
+          "path": [
+            "api",
+            "time-slots",
+            "available"
+          ]
+        },
+        "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+      },
+      "response": []
+    },
+    {
+      "name": "Login as a customer",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Parse the response body",
+              "let response = pm.response.json();",
+              "",
+              "// Basic test: status code should be 200",
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Body contains token\", function () {",
+              "    pm.expect(pm.response.text()).to.include(\"token\");",
+              "});",
+              "",
+              "pm.test(\"Body contains customer role\", function () {",
+              "    pm.expect(pm.response.text()).to.include(\"customer\");",
+              "});",
+              "",
+              "pm.test(\"Content-Type is present\", function () {",
+              "    pm.response.to.have.header(\"Content-Type\");",
+              "});",
+              "",
+              "pm.test(\"Response time is less than 200ms\", function () {",
+              "    pm.expect(pm.response.responseTime).to.be.below(200);",
+              "});",
+              "",
+              "// Save JWT token to environment variable",
+              "if (response.token) {",
+              "    pm.environment.set(\"jwt_token\", response.token);",
+              "    console.log(\"JWT Token saved to environment\");",
+              "} else {",
+              "    console.warn(\"No token found in response!\");",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"{{customer_password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://52.65.216.208:5001/api/auth/login",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "port": "5001",
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        },
+        "description": "This is a POST request, submitting data to an API via the request body. This request submits JSON data, and the data is reflected in the response.\n\nA successful POST request typically returns a `200 OK` or `201 Created` response code."
+      },
+      "response": []
+    },
+    {
+      "name": "Edit profile",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let response = pm.response.json();\r",
+              "\r",
+              "pm.test(\"Status code is 200\", function () {\r",
+              "    pm.response.to.have.status(200);\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Content-Type is present\", function () {\r",
+              "    pm.response.to.have.header(\"Content-Type\");\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Profile updated successfully\", function () {\r",
+              "    pm.expect(response.message).to.eql(\"Profile updated successfully\");\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Updated name is returned\", function () {\r",
+              "    pm.expect(response.name).to.eql(\"Jane Updated\");\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Updated phone is returned\", function () {\r",
+              "    pm.expect(response.phone).to.eql(\"0411222333\");\r",
+              "});\r",
+              "\r",
+              "if (response.token) {\r",
+              "    pm.environment.set(\"jwt_token\", response.token);\r",
+              "    console.log(\"Updated JWT token saved\");\r",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"name\": \"Jane Updated\",\r\n  \"phone\": \"0411222333\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://52.65.216.208:5001/api/auth/profile",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "port": "5001",
+          "path": [
+            "api",
+            "auth",
+            "profile"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create a reservation",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let response = pm.response.json();\r",
+              "\r",
+              "pm.test(\"Status code is 201\", function () {\r",
+              "    pm.response.to.have.status(201);\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Reservation was confirmed\", function () {\r",
+              "    pm.expect(response.message).to.eql(\"Reservation confirmed successfully\");\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Reservation ID is returned\", function () {\r",
+              "    pm.expect(response.reservation._id).to.exist;\r",
+              "});\r",
+              "\r",
+              "if (response.reservation && response.reservation._id) {\r",
+              "    pm.environment.set(\"reservation_id\", response.reservation._id);\r",
+              "    console.log(\"Reservation ID saved:\", response.reservation._id);\r",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"date\": \"2026-06-23\",\r\n  \"timeSlot\": \"6a117e776af93fb6f5d6b8ce\",\r\n  \"guests\": 2,\r\n  \"tablePreference\": \"Window seat\",\r\n  \"requests\": \"No nuts, please\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://52.65.216.208:5001/api/reservations",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "port": "5001",
+          "path": [
+            "api",
+            "reservations"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Cancel reservation",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let response = pm.response.json();\r",
+              "\r",
+              "pm.test(\"Status code is 200\", function () {\r",
+              "    pm.response.to.have.status(200);\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Reservation cancelled successfully\", function () {\r",
+              "    pm.expect(response.message).to.eql(\"Reservation cancelled successfully\");\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Reservation status is Cancelled\", function () {\r",
+              "    pm.expect(response.reservation.status).to.eql(\"Cancelled\");\r",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PATCH",
+        "header": [],
+        "url": {
+          "raw": "http://52.65.216.208:5001/api/reservations/6a293b923636b3b66173da26/cancel",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "port": "5001",
+          "path": [
+            "api",
+            "reservations",
+            "6a293b923636b3b66173da26",
+            "cancel"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Logged-In User Profile",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let response = pm.response.json();\r",
+              "\r",
+              "pm.test(\"Status code is 200\", function () {\r",
+              "    pm.response.to.have.status(200);\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Content-Type is present\", function () {\r",
+              "    pm.response.to.have.header(\"Content-Type\");\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Profile has name\", function () {\r",
+              "    pm.expect(response.name).to.exist;\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Profile has email\", function () {\r",
+              "    pm.expect(response.email).to.exist;\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Profile has role\", function () {\r",
+              "    pm.expect(response.role).to.exist;\r",
+              "});\r",
+              "\r",
+              "console.log(\"Profile response:\", response);"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://52.65.216.208:5001/api/auth/profile",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "port": "5001",
+          "path": [
+            "api",
+            "auth",
+            "profile"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get my reservations",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let response = pm.response.json();\r",
+              "\r",
+              "pm.test(\"Status code is 200\", function () {\r",
+              "    pm.response.to.have.status(200);\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Response is an array\", function () {\r",
+              "    pm.expect(response).to.be.an(\"array\");\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Content-Type is present\", function () {\r",
+              "    pm.response.to.have.header(\"Content-Type\");\r",
+              "});\r",
+              "\r",
+              "console.log(\"My reservations:\", response);"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://52.65.216.208:5001/api/reservations/my",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "port": "5001",
+          "path": [
+            "api",
+            "reservations",
+            "my"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Login as admin",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let response = pm.response.json();\r",
+              "\r",
+              "pm.test(\"Status code is 200\", function () {\r",
+              "    pm.response.to.have.status(200);\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Logged in as admin\", function () {\r",
+              "    pm.expect(response.role).to.eql(\"admin\");\r",
+              "});\r",
+              "\r",
+              "if (response.token) {\r",
+              "    pm.environment.set(\"jwt_token\", response.token);\r",
+              "    console.log(\"Admin JWT token saved\");\r",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"email\": \"{{admin_email}}\",\r\n  \"password\": \"{{admin_password}}\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://52.65.216.208:5001/api/auth/login",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "port": "5001",
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "delete a reservation",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let response = pm.response.json();\r",
+              "\r",
+              "pm.test(\"Status code is 200\", function () {\r",
+              "    pm.response.to.have.status(200);\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Content-Type is present\", function () {\r",
+              "    pm.response.to.have.header(\"Content-Type\");\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Reservation deleted successfully\", function () {\r",
+              "    pm.expect(response.message).to.eql(\"Reservation deleted successfully\");\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Deleted reservation ID is returned\", function () {\r",
+              "    pm.expect(response.reservationId).to.eql(pm.environment.get(\"reservation_id\"));\r",
+              "});\r",
+              "\r",
+              "console.log(\"Delete response:\", response);"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "packages": {},
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "http://52.65.216.208:5001/api/reservations/admin/6a365698d30f2d243201a980",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "port": "5001",
+          "path": [
+            "api",
+            "reservations",
+            "admin",
+            "6a365698d30f2d243201a980"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get all tables",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://52.65.216.208/api/tables",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "path": [
+            "api",
+            "tables"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get all timeslots",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://52.65.216.208/api/time-slots",
+          "protocol": "http",
+          "host": [
+            "52",
+            "65",
+            "216",
+            "208"
+          ],
+          "path": [
+            "api",
+            "time-slots"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
