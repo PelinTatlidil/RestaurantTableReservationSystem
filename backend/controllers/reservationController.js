@@ -1,8 +1,6 @@
 const mongoose = require('mongoose');
 const Reservation = require('../models/Reservation');
-const ReservationSubject = require('../observers/ReservationSubject');
-const CustomerNotificationObserver = require('../observers/CustomerNotificationObserver');
-const ReservationAuditObserver = require('../observers/ReservationAuditObserver');
+const ReservationFacade = require('../facades/ReservationFacade');
 const Table = require('../models/Table');
 const TimeSlot = require('../models/TimeSlot');
 const User = require('../models/User');
@@ -13,10 +11,7 @@ const {
 } = require('./TableSelectionStrategy');
 const { ReservationDataAccessProxy } = require('../proxies/AccessControlProxy');
 
-const reservationSubject = new ReservationSubject();
-
-reservationSubject.addObserver(new CustomerNotificationObserver());
-reservationSubject.addObserver(new ReservationAuditObserver());
+const reservationFacade = new ReservationFacade();
 
 const reservationStatuses = ['Pending', 'Confirmed', 'Cancelled', 'Completed', 'No-show'];
 const activeBookingStatuses = ['Pending', 'Confirmed'];
@@ -674,35 +669,21 @@ const updateReservationStatus = async (req, res) => {
   }
 
   try {
-    const reservation = await Reservation.findById(req.params.id);
-
-    if (!reservation) {
-      return res.status(404).json({ message: 'Reservation not found' });
-    }
-
-    const previousStatus = normalizeStatus(reservation.status);
-    const notificationMessage = `Your reservation status has been updated to ${newStatus}.`;
-
-    reservation.status = newStatus;
-
-    await reservationSubject.notifyObservers({
-      reservation,
-      previousStatus,
+    const result = await reservationFacade.updateReservationStatus({
+      reservationId: req.params.id,
       newStatus,
       changedBy: req.user._id,
-      notificationMessage,
+      normalizeStatus,
     });
 
-    await reservation.save();
-
-    const populatedReservation = await populateReservationById(reservation._id);
-
+    if (result.notFound) {
+      return res.status(404).json({ message: 'Reservation not found' });
+    }
     // PROXY PATTERN: Return full data for admin
     const filteredReservation = ReservationDataAccessProxy.filterReservationData(
-      populatedReservation,
+      result.reservation,
       'admin'
     );
-
     return res.status(200).json(filteredReservation);
   } catch (error) {
     return res.status(500).json({ message: reservationErrorMessage(error) });
