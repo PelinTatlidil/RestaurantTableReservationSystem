@@ -4,6 +4,12 @@
 
 This project is a Restaurant Table Reservation System. It allows customers to register, log in, make table reservations, view their reservations, update reservations, and cancel reservations. It also allows the admin user to manage reservations, tables, and dashboard information.
 
+## User Roles
+
+The system has two main user roles:
+
+- Customer: can register, log in, view restaurant information, check availability, make reservations, view their own reservations, update reservations, cancel reservations, and update their profile.
+- Admin: can log in to the admin dashboard and manage reservations, update reservation status, manage tables, manage time slots, manage users, and update restaurant information.
 ## Backend Design Patterns
 
 The backend demonstrates several object-oriented design patterns to keep the reservation system organized, reusable, and easier to maintain.
